@@ -105,6 +105,11 @@
                 <span class="text-slate-400">アルゴ自動売買:</span>
                 <span id="algo-status-text" class="font-bold text-slate-500">停止中</span>
             </div>
+            <!-- APIキー設定ボタン -->
+            <button onclick="openApiKeyModal()" class="bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 text-xs px-3 py-1.5 rounded-md flex items-center gap-1.5 transition">
+                <svg class="w-3.5 h-3.5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 0121 9z"></path></svg>
+                APIキー設定
+            </button>
             <!-- 手動更新ボタン -->
             <button onclick="fetchStockPrices()" class="bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 text-xs px-3 py-1.5 rounded-md flex items-center gap-1.5 transition">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
@@ -112,6 +117,32 @@
             </button>
         </div>
     </header>
+    <!-- モーダル（取引パスワード確認等のカスタムダイアログ） -->
+    <div id="custom-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+        <div class="bg-sbi-card border border-sbi-border rounded-xl p-6 w-96 shadow-2xl">
+            <h3 id="modal-title" class="text-lg font-bold text-white mb-2"></h3>
+            <p id="modal-message" class="text-sm text-slate-300 mb-6"></p>
+            <div class="flex justify-end">
+                <button onclick="closeModal()" class="bg-sbi-accent hover:bg-blue-600 text-white font-bold py-2 px-5 rounded-lg text-sm transition">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- APIキー設定モーダル -->
+    <div id="api-key-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+        <div class="bg-sbi-card border border-sbi-border rounded-xl p-6 w-96 shadow-2xl space-y-4">
+            <h3 class="text-lg font-bold text-white">Twelve Data APIキー設定</h3>
+            <p class="text-xs text-slate-300">GitHub Pages等で自分のAPIキーを使用する場合は入力してください（LocalStorageに自動保存されます）。</p>
+            <div>
+                <label class="text-xs text-slate-400 block mb-1">API Key</label>
+                <input type="text" id="api-key-input" placeholder="Twelve Data API Key" class="w-full bg-slate-900 border border-slate-700 text-white font-mono p-2 rounded text-xs focus:outline-none focus:border-blue-500">
+            </div>
+            <div class="flex justify-end gap-2">
+                <button onclick="closeApiKeyModal()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold py-1.5 px-4 rounded text-xs transition">キャンセル</button>
+                <button onclick="saveApiKey()" class="bg-sbi-accent hover:bg-blue-600 text-white font-bold py-1.5 px-4 rounded text-xs transition">保存して適用</button>
+            </div>
+        </div>
+    </div>
 
     <!-- ナビゲーションタブ -->
     <nav class="bg-slate-900 border-b border-sbi-border px-4 flex gap-1 shrink-0">
@@ -425,7 +456,7 @@
         // 1. グローバルアプリケーション状態 (AppState)
         // ==========================================
         const AppState = {
-            twelveApiKey: 'b26e3fcf62784fa4915c5ae7a0937614', // Twelve Data API Key
+            twelveApiKey: localStorage.getItem('sbi_twelve_api_key') || 'b26e3fcf62784fa4915c5ae7a0937614', // Twelve Data API Key
             cash: 3000000,           // 初期買付余力
             robotBudget: 1500000,    // ロボ専用枠
             robotActive: false,      // ロボ動作フラグ
@@ -472,34 +503,53 @@
             const apiUrl = `https://api.twelvedata.com/quote?symbol=${encodeURIComponent(symbols)}&apikey=${AppState.twelveApiKey}`;
 
             try {
-                const res = await fetch(apiUrl, { signal: AbortSignal.timeout(3500) });
-                if (res.ok) {
+                const res = await fetch(apiUrl, { signal: AbortSignal.timeout(5000) });
+                
+                if (!res.ok) {
+                    console.error(`[Twelve Data API Fetch Error] HTTP Status: ${res.status} ${res.statusText}`);
+                } else {
                     const data = await res.json();
                     
-                    Object.keys(AppState.stocks).forEach(code => {
-                        const symbol = AppState.stocks[code].symbol;
-                        // 単一銘柄と複数銘柄レスポンスに対応
-                        const quote = data[symbol] || (data.symbol === symbol ? data : null);
+                    // API全体のエラー（APIキーが無効、リクエスト制限超過など）を検知
+                    if (data.status === 'error' || data.code) {
+                        console.error('[Twelve Data API Error Response]', data.message || data);
+                    } else {
+                        Object.keys(AppState.stocks).forEach(code => {
+                            const symbol = AppState.stocks[code].symbol;
+                            // 単一銘柄と複数銘柄レスポンスに対応
+                            const quote = data[symbol] || (data.symbol === symbol ? data : null);
 
-                        if (quote && quote.close) {
-                            const price = parseFloat(quote.close);
-                            const openPrice = parseFloat(quote.open || quote.previous_close || price);
-                            const highPrice = parseFloat(quote.high || price);
-                            const lowPrice = parseFloat(quote.low || price);
+                            if (quote) {
+                                // 土日や市場閉場中でも終値や前日終値（previous_close, close）を取得できるように緩和
+                                if (quote.status === 'error') {
+                                    console.error(`[Twelve Data Symbol Error] (${symbol}):`, quote.message || quote);
+                                    return;
+                                }
 
-                            if (price && price > 0) {
-                                const st = AppState.stocks[code];
-                                st.open = openPrice;
-                                st.high = Math.max(st.high, highPrice);
-                                st.low = Math.min(st.low, lowPrice);
-                                updateStockPriceState(code, price);
-                                anySuccess = true;
+                                const rawPrice = quote.close || quote.previous_close;
+                                if (rawPrice) {
+                                    const price = parseFloat(rawPrice);
+                                    const openPrice = parseFloat(quote.open || quote.previous_close || price);
+                                    const highPrice = parseFloat(quote.high || price);
+                                    const lowPrice = parseFloat(quote.low || price);
+
+                                    if (!isNaN(price) && price > 0) {
+                                        const st = AppState.stocks[code];
+                                        st.open = isNaN(openPrice) ? price : openPrice;
+                                        st.high = isNaN(highPrice) ? price : Math.max(st.high, highPrice);
+                                        st.low = isNaN(lowPrice) ? price : Math.min(st.low, lowPrice);
+                                        updateStockPriceState(code, price);
+                                        anySuccess = true;
+                                    }
+                                } else {
+                                    console.warn(`[Twelve Data Warning] 株価データが見つかりません (${symbol}):`, quote);
+                                }
                             }
-                        }
-                    });
+                        });
+                    }
                 }
             } catch (err) {
-                console.warn("Twelve Data API direct fetch failed, falling back to backup proxy/simulation", err);
+                console.error("[Twelve Data API Network/Fetch Exception]", err);
             }
 
             const labelEl = document.getElementById('data-source-label');
@@ -519,6 +569,28 @@
             runMatchingEngine();
             if (AppState.robotActive) runAlgorithmicTradingLogic();
             renderUI();
+        }
+
+        function openApiKeyModal() {
+            document.getElementById('api-key-input').value = AppState.twelveApiKey;
+            document.getElementById('api-key-modal').classList.remove('hidden');
+        }
+
+        function closeApiKeyModal() {
+            document.getElementById('api-key-modal').classList.add('hidden');
+        }
+
+        function saveApiKey() {
+            const inputVal = document.getElementById('api-key-input').value.trim();
+            if (inputVal) {
+                AppState.twelveApiKey = inputVal;
+                localStorage.setItem('sbi_twelve_api_key', inputVal);
+                showToast('APIキーを保存・更新しました。');
+                closeApiKeyModal();
+                fetchStockPrices();
+            } else {
+                showModal('エラー', '有効なAPIキーを入力してください。');
+            }
         }
 
         // ネットワーク障害・API制限時の自動サイン波フォールバック
