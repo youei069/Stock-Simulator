@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SBI証券 アルゴリズム取引＆特殊注文検証シミュレーター PRO</title>
-    <!-- Tailwind CSS (CDN) -->
+    <title>擬似SBI証券・アルゴリズム取引＆特殊注文検証シミュレーター (PRO Edition)</title>
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -12,183 +12,197 @@
                 extend: {
                     colors: {
                         sbi: {
-                            dark: '#0a111e',
-                            card: '#121d31',
-                            header: '#0f1a2e',
-                            accent: '#1e66f5',
-                            accentHover: '#2b72ff',
-                            up: '#ef4444',
-                            down: '#22c55e',
-                            text: '#e2e8f0',
-                            border: '#1e2d4a'
+                            navy: '#0b192c',
+                            card: '#1e293b',
+                            header: '#0f172a',
+                            accent: '#2563eb',
+                            up: '#ef4444',     // 日本仕様：上昇は赤
+                            down: '#22c55e',   // 日本仕様：下落は緑
+                            border: '#334155'
                         }
+                    },
+                    fontFamily: {
+                        mono: ['Courier New', 'Courier', 'monospace'],
+                        sans: ['Inter', 'sans-serif']
                     }
                 }
             }
         }
     </script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap');
-        
         body {
-            font-family: 'Noto Sans JP', sans-serif;
-            background-color: #0a111e;
-            color: #e2e8f0;
+            background-color: #090d16;
+            color: #f1f5f9;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            user-select: none;
         }
-
-        .num-mono {
-            font-family: 'JetBrains Mono', monospace;
+        .mono-num {
+            font-family: 'Courier New', Courier, monospace;
+            text-align: right;
         }
-
-        /* Dynamic Flash Animations for Price Updates */
+        .flash-up {
+            animation: flashUp 0.6s ease-out;
+        }
+        .flash-down {
+            animation: flashDown 0.6s ease-out;
+        }
         @keyframes flashUp {
-            0% { background-color: rgba(239, 68, 68, 0.35); }
+            0% { background-color: rgba(239, 68, 68, 0.4); }
             100% { background-color: transparent; }
         }
         @keyframes flashDown {
-            0% { background-color: rgba(34, 197, 94, 0.35); }
+            0% { background-color: rgba(34, 197, 94, 0.4); }
             100% { background-color: transparent; }
         }
-
-        .flash-up { animation: flashUp 0.6s ease-out; }
-        .flash-down { animation: flashDown 0.6s ease-out; }
-
-        /* Custom Scrollbar */
+        /* スクロールバーのカスタマイズ */
         ::-webkit-scrollbar {
             width: 6px;
             height: 6px;
         }
         ::-webkit-scrollbar-track {
-            background: #0f1a2e;
+            background: #0f172a;
         }
         ::-webkit-scrollbar-thumb {
-            background: #1e2d4a;
+            background: #334155;
             border-radius: 3px;
         }
         ::-webkit-scrollbar-thumb:hover {
-            background: #2b4069;
-        }
-
-        .board-row:hover {
-            background-color: rgba(30, 102, 245, 0.15);
+            background: #475569;
         }
     </style>
 </head>
-<body class="min-h-screen flex flex-col text-xs sm:text-sm">
+<body class="h-screen flex flex-col overflow-hidden">
 
-    <!-- Header -->
-    <header class="bg-sbi-header border-b border-sbi-border px-4 py-2.5 flex flex-wrap justify-between items-center shadow-lg">
-        <div class="flex items-center gap-3">
-            <div class="flex items-center gap-1.5 font-bold text-lg text-white tracking-wide">
-                <span class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-2 py-0.5 rounded text-xs font-black shadow-sm">SBI</span>
-                <span>SBI証券 HYPER simulator</span>
-                <span class="text-xs font-normal text-blue-400 border border-blue-500/40 px-1.5 py-0.2 rounded bg-blue-500/10">PRO Edition</span>
+    <!-- トースト通知コンテナ -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- モーダル（取引パスワード確認等のカスタムダイアログ） -->
+    <div id="custom-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+        <div class="bg-sbi-card border border-sbi-border rounded-xl p-6 w-96 shadow-2xl">
+            <h3 id="modal-title" class="text-lg font-bold text-white mb-2"></h3>
+            <p id="modal-message" class="text-sm text-slate-300 mb-6"></p>
+            <div class="flex justify-end">
+                <button onclick="closeModal()" class="bg-sbi-accent hover:bg-blue-600 text-white font-bold py-2 px-5 rounded-lg text-sm transition">OK</button>
             </div>
         </div>
+    </div>
 
-        <div class="flex items-center gap-4 text-xs mt-2 sm:mt-0">
-            <div class="flex items-center gap-2 bg-sbi-dark px-3 py-1 rounded-md border border-sbi-border">
-                <span class="text-gray-400">回線:</span>
-                <span class="inline-flex items-center gap-1 text-emerald-400 font-medium">
-                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> 接続中
-                </span>
+    <!-- トップヘッダー -->
+    <header class="bg-sbi-header border-b border-sbi-border px-4 py-2.5 flex items-center justify-between shrink-0">
+        <div class="flex items-center gap-3">
+            <div class="bg-gradient-to-r from-blue-700 to-indigo-800 text-white font-black px-3 py-1 rounded text-base tracking-wider shadow">
+                SBI<span class="text-xs font-normal opacity-80 ml-1">擬似シミュレーター</span>
             </div>
+            <span class="text-xs text-slate-400 bg-slate-800 px-2.5 py-1 rounded-full border border-slate-700 flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                データ提供: <span id="data-source-label" class="font-bold text-emerald-400">stock_data.json (GitHub Actions自動更新)</span>
+            </span>
+        </div>
 
-            <div class="flex items-center gap-2 bg-sbi-dark px-3 py-1 rounded-md border border-sbi-border">
-                <span class="text-gray-400">データ:</span>
-                <span id="data-source-label" class="font-medium text-blue-400">取得中...</span>
+        <div class="flex items-center gap-4">
+            <!-- ロボステータス表示 -->
+            <div id="algo-status-badge" class="flex items-center gap-2 bg-slate-900/80 border border-slate-700/80 px-3 py-1 rounded-lg text-xs">
+                <span class="text-slate-400">アルゴ自動売買:</span>
+                <span id="algo-status-text" class="font-bold text-slate-500">停止中</span>
             </div>
-
-            <!-- Algo Control Toggle -->
-            <div class="flex items-center gap-2 bg-sbi-card px-3 py-1 rounded-md border border-sbi-border">
-                <span class="text-gray-400">アルゴ自動取引:</span>
-                <span id="robot-status-text" class="font-bold text-sbi-up animate-pulse">⚠️ 運用中</span>
-                <button onclick="toggleRobot()" class="ml-1 bg-sbi-accent hover:bg-sbi-accentHover text-white px-2.5 py-0.5 rounded transition text-xs font-medium">
-                    切替
-                </button>
-            </div>
+            <!-- 手動更新ボタン -->
+            <button onclick="fetchStockPrices()" class="bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 text-xs px-3 py-1.5 rounded-md flex items-center gap-1.5 transition">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                手動更新
+            </button>
         </div>
     </header>
 
-    <!-- Navigation Tabs -->
-    <nav class="bg-sbi-header/60 border-b border-sbi-border px-4 flex gap-1 pt-2">
-        <button class="nav-tab active px-5 py-2 font-bold rounded-t-md transition border-b-2 border-sbi-accent text-sbi-accent bg-sbi-card" onclick="switchTab('home')">【ホーム】サマリー</button>
-        <button class="nav-tab px-5 py-2 font-bold rounded-t-md transition border-b-2 border-transparent text-gray-400 hover:text-gray-200" onclick="switchTab('trade')">【取引】板・チャート・注文</button>
-        <button class="nav-tab px-5 py-2 font-bold rounded-t-md transition border-b-2 border-transparent text-gray-400 hover:text-gray-200" onclick="switchTab('portfolio')">【保有資産】ポートフォリオ</button>
-        <button class="nav-tab px-5 py-2 font-bold rounded-t-md transition border-b-2 border-transparent text-gray-400 hover:text-gray-200" onclick="switchTab('orders')">【注文履歴・アルゴ分析】</button>
+    <!-- ナビゲーションタブ -->
+    <nav class="bg-slate-900 border-b border-sbi-border px-4 flex gap-1 shrink-0">
+        <button onclick="switchTab('tab-home')" id="btn-tab-home" class="nav-tab text-xs font-bold px-5 py-2.5 text-blue-400 border-b-2 border-blue-500 transition">ホーム (サマリー)</button>
+        <button onclick="switchTab('tab-trade')" id="btn-tab-trade" class="nav-tab text-xs font-bold px-5 py-2.5 text-slate-400 hover:text-slate-200 border-b-2 border-transparent transition">取引・板情報</button>
+        <button onclick="switchTab('tab-portfolio')" id="btn-tab-portfolio" class="nav-tab text-xs font-bold px-5 py-2.5 text-slate-400 hover:text-slate-200 border-b-2 border-transparent transition">保有資産</button>
+        <button onclick="switchTab('tab-orders')" id="btn-tab-orders" class="nav-tab text-xs font-bold px-5 py-2.5 text-slate-400 hover:text-slate-200 border-b-2 border-transparent transition">注文一覧・ロボ出力</button>
     </nav>
 
-    <!-- Main Content Area -->
-    <main class="flex-1 p-4 max-w-[1600px] w-full mx-auto space-y-4">
+    <!-- メインコンテンツエリア (SPA構造) -->
+    <main class="flex-1 overflow-auto p-4 relative">
 
-        <!-- 1. HOME TAB -->
-        <div id="page-home" class="page-content space-y-4">
-            <!-- Account Summary Cards -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div class="bg-sbi-card border border-sbi-border p-4 rounded-xl shadow-sm">
-                    <div class="text-gray-400 text-xs mb-1 font-medium">総資産評価額</div>
-                    <div class="text-2xl font-bold num-mono text-white" id="sum-total-asset">¥0</div>
-                    <div class="text-[11px] text-gray-500 mt-1">Cash + Portfolio</div>
+        <!-- 1. ホーム（口座サマリー）タブ -->
+        <div id="tab-home" class="tab-page space-y-4">
+            <!-- 上部資産サマリーカード -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="bg-sbi-card p-4 rounded-xl border border-sbi-border shadow">
+                    <div class="text-xs text-slate-400 mb-1">総資産評価額</div>
+                    <div id="summary-total-asset" class="text-2xl font-bold mono-num text-white">¥3,000,000</div>
+                    <div class="text-[11px] text-slate-500 mt-1">初期元本: ¥3,000,000</div>
                 </div>
-                <div class="bg-sbi-card border border-sbi-border p-4 rounded-xl shadow-sm">
-                    <div class="text-gray-400 text-xs mb-1 font-medium">買付余力（ユーザー）</div>
-                    <div class="text-2xl font-bold num-mono text-blue-400" id="sum-cash">¥0</div>
-                    <div class="text-[11px] text-gray-500 mt-1">手動取引可能枠</div>
+                <div class="bg-sbi-card p-4 rounded-xl border border-sbi-border shadow">
+                    <div class="text-xs text-slate-400 mb-1">買付余力 (現金)</div>
+                    <div id="summary-cash" class="text-2xl font-bold mono-num text-blue-400">¥3,000,000</div>
+                    <div class="text-[11px] text-slate-500 mt-1">即時利用可能</div>
                 </div>
-                <div class="bg-sbi-card border border-sbi-border p-4 rounded-xl shadow-sm">
-                    <div class="text-gray-400 text-xs mb-1 font-medium">アルゴロボ専用運用余力</div>
-                    <div class="text-2xl font-bold num-mono text-indigo-400" id="sum-robot-cash">¥0</div>
-                    <div class="text-[11px] text-gray-500 mt-1">自動発注枠（上限分離）</div>
+                <div class="bg-sbi-card p-4 rounded-xl border border-sbi-border shadow">
+                    <div class="text-xs text-slate-400 mb-1">保有株式評価額</div>
+                    <div id="summary-stock-value" class="text-2xl font-bold mono-num text-white">¥0</div>
+                    <div class="text-[11px] text-slate-500 mt-1">評価損益合算対象</div>
                 </div>
-                <div class="bg-sbi-card border border-sbi-border p-4 rounded-xl shadow-sm">
-                    <div class="text-gray-400 text-xs mb-1 font-medium">評価損益合計</div>
-                    <div class="text-2xl font-bold num-mono" id="sum-profit-total">¥0 (+0.00%)</div>
-                    <div class="text-[11px] text-gray-500 mt-1">含み損益リアルタイム試算</div>
+                <div class="bg-sbi-card p-4 rounded-xl border border-sbi-border shadow">
+                    <div class="text-xs text-slate-400 mb-1">含み損益 (トータル)</div>
+                    <div id="summary-profit-loss" class="text-2xl font-bold mono-num text-slate-400">¥0 (0.00%)</div>
+                    <div class="text-[11px] text-slate-500 mt-1">全保有銘柄の合計</div>
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <!-- Portfolio Summary -->
-                <div class="bg-sbi-card border border-sbi-border rounded-xl p-4">
-                    <h3 class="text-base font-bold text-white mb-3 flex items-center gap-2">
-                        <span class="w-1.5 h-4 bg-sbi-accent rounded"></span> 保有銘柄サマリー
-                    </h3>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left border-collapse">
-                            <thead>
-                                <tr class="border-b border-sbi-border text-gray-400 text-xs bg-sbi-dark/50">
-                                    <th class="py-2 px-3">銘柄</th>
-                                    <th class="py-2 px-3 text-right">数量</th>
-                                    <th class="py-2 px-3 text-right">取得単価</th>
-                                    <th class="py-2 px-3 text-right">現在値</th>
-                                    <th class="py-2 px-3 text-right">評価損益</th>
-                                </tr>
-                            </thead>
-                            <tbody id="home-portfolio-table" class="divide-y divide-sbi-border/50 text-xs">
-                                <!-- Dynamic -->
-                            </tbody>
-                        </table>
+            <!-- アルゴロボ運用＆市場銘柄サマリー -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <!-- アルゴコントロール -->
+                <div class="bg-sbi-card p-5 rounded-xl border border-sbi-border shadow space-y-4">
+                    <div class="flex items-center justify-between border-b border-slate-700 pb-3">
+                        <h2 class="font-bold text-base text-white flex items-center gap-2">
+                            🤖 アルゴリズム自動売買エンジン
+                        </h2>
+                        <button id="algo-toggle-btn" onclick="toggleRobot()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2 rounded-lg transition shadow">
+                            稼働開始
+                        </button>
+                    </div>
+
+                    <div class="space-y-3 text-xs">
+                        <div class="bg-slate-900/60 p-3 rounded-lg border border-slate-800 space-y-2">
+                            <div class="font-semibold text-slate-300">ロジック設定 (移動平均クロス)</div>
+                            <div class="grid grid-cols-2 gap-2 text-slate-400">
+                                <div>短期SMA: <span class="text-white font-mono">5回</span></div>
+                                <div>中期SMA: <span class="text-white font-mono">10回</span></div>
+                                <div>損切り設定: <span class="text-red-400 font-mono">-2.0%</span></div>
+                                <div>運用上限: <span class="text-blue-400 font-mono">150万円</span></div>
+                            </div>
+                        </div>
+
+                        <div class="space-y-2">
+                            <label class="text-slate-400 block">アルゴロボ運用資金枠調整</label>
+                            <input type="range" id="algo-budget-slider" min="500000" max="3000000" step="100000" value="1500000" oninput="updateAlgoBudgetLabel(this.value)" class="w-full">
+                            <div class="flex justify-between text-[11px] text-slate-500">
+                                <span>50万円</span>
+                                <span id="algo-budget-label" class="text-blue-400 font-bold">150万円</span>
+                                <span>300万円</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Ticker Board Summary -->
-                <div class="bg-sbi-card border border-sbi-border rounded-xl p-4">
-                    <h3 class="text-base font-bold text-white mb-3 flex items-center gap-2">
-                        <span class="w-1.5 h-4 bg-sbi-accent rounded"></span> 監視対象銘柄 リアルタイム気配
-                    </h3>
+                <!-- 市場銘柄一覧ボード -->
+                <div class="md:col-span-2 bg-sbi-card p-5 rounded-xl border border-sbi-border shadow space-y-3">
+                    <h2 class="font-bold text-base text-white border-b border-slate-700 pb-2">監視対象銘柄一覧</h2>
                     <div class="overflow-x-auto">
-                        <table class="w-full text-left border-collapse">
+                        <table class="w-full text-xs">
                             <thead>
-                                <tr class="border-b border-sbi-border text-gray-400 text-xs bg-sbi-dark/50">
-                                    <th class="py-2 px-3">コード / 銘柄</th>
-                                    <th class="py-2 px-3 text-right">現在値</th>
-                                    <th class="py-2 px-3 text-right">前日比</th>
-                                    <th class="py-2 px-3 text-right">騰落率</th>
-                                    <th class="py-2 px-3 text-center">操作</th>
+                                <tr class="text-slate-400 border-b border-slate-700">
+                                    <th class="py-2 text-left">銘柄名 / コード</th>
+                                    <th class="py-2 text-right">現在値</th>
+                                    <th class="py-2 text-right">前日比</th>
+                                    <th class="py-2 text-right">高値</th>
+                                    <th class="py-2 text-right">安値</th>
+                                    <th class="py-2 text-center">操作</th>
                                 </tr>
                             </thead>
-                            <tbody id="home-ticker-table" class="divide-y divide-sbi-border/50 text-xs">
-                                <!-- Dynamic -->
+                            <tbody id="home-stock-table-body" class="divide-y divide-slate-800">
+                                <!-- JSで動的生成 -->
                             </tbody>
                         </table>
                     </div>
@@ -196,1096 +210,847 @@
             </div>
         </div>
 
-        <!-- 2. TRADE TAB -->
-        <div id="page-trade" class="page-content hidden space-y-4">
-            <!-- Stock Selector Bar -->
-            <div class="bg-sbi-card border border-sbi-border rounded-xl p-3 flex flex-wrap items-center justify-between gap-4">
-                <div class="flex items-center gap-3">
-                    <label class="text-gray-400 font-medium">銘柄選択:</label>
-                    <select id="trade-stock-select" onchange="changeSelectedStock(this.value)" class="bg-sbi-dark border border-sbi-border text-white font-bold rounded px-3 py-1.5 focus:outline-none focus:border-sbi-accent">
-                        <option value="7203">7203 トヨタ自動車</option>
-                        <option value="6758">6758 ソニーグループ</option>
-                        <option value="8306">8306 三菱UFJ FG</option>
-                        <option value="7974">7974 任天堂</option>
-                    </select>
-                </div>
-                <div id="stock-quick-info" class="flex items-center gap-4 text-sm">
-                    <!-- Dynamic -->
-                </div>
-            </div>
-
-            <!-- Trading Grid: Chart/Info, Board (Ita), Order Ticket -->
-            <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
-                
-                <!-- Chart & Technical Indicator (5 cols) -->
-                <div class="lg:col-span-5 space-y-4">
-                    <div class="bg-sbi-card border border-sbi-border rounded-xl p-4">
-                        <div class="flex justify-between items-center mb-3">
-                            <h3 class="font-bold text-white flex items-center gap-2">
-                                <span class="w-1.5 h-4 bg-sbi-accent rounded"></span> リアルタイムチャート & 移動平均
-                            </h3>
-                            <div class="flex items-center gap-3 text-xs">
-                                <span class="flex items-center gap-1 text-sky-400"><span class="w-2.5 h-0.5 bg-sky-400"></span> 5SMA</span>
-                                <span class="flex items-center gap-1 text-amber-400"><span class="w-2.5 h-0.5 bg-amber-400"></span> 10SMA</span>
-                            </div>
+        <!-- 2. 取引・板情報タブ -->
+        <div id="tab-trade" class="tab-page hidden grid grid-cols-1 lg:grid-cols-12 gap-4">
+            <!-- 左エリア: 銘柄選択 & チャート (7列) -->
+            <div class="lg:col-span-7 flex flex-col gap-4">
+                <!-- 銘柄ヘッダー selector -->
+                <div class="bg-sbi-card p-4 rounded-xl border border-sbi-border flex flex-wrap items-center justify-between gap-2 shadow">
+                    <div class="flex items-center gap-3">
+                        <select id="trade-stock-select" onchange="changeSelectedStock(this.value)" class="bg-slate-900 border border-slate-700 text-white font-bold text-sm px-3 py-1.5 rounded-lg focus:outline-none focus:border-blue-500">
+                            <option value="7203">7203: トヨタ自動車</option>
+                            <option value="6758">6758: ソニーグループ</option>
+                            <option value="8306">8306: 三菱UFJフィナンシャルG</option>
+                            <option value="7974">7974: 任天堂</option>
+                            <option value="AAPL">AAPL: アップル</option>
+                        </select>
+                        <div id="trade-stock-price-display" class="flex items-baseline gap-2">
+                            <span class="text-2xl font-bold font-mono text-white">¥0</span>
+                            <span class="text-xs font-mono text-slate-400">(--)</span>
                         </div>
-                        
-                        <!-- Canvas Chart -->
-                        <div class="relative w-full h-64 bg-sbi-dark rounded-lg border border-sbi-border p-1 overflow-hidden">
-                            <canvas id="realtime-chart" class="w-full h-full"></canvas>
-                        </div>
-
-                        <!-- Mini Stats Grid -->
-                        <div class="grid grid-cols-4 gap-2 mt-3 text-center text-xs">
-                            <div class="bg-sbi-dark/60 p-2 rounded border border-sbi-border">
-                                <div class="text-gray-400">始値</div>
-                                <div id="info-open" class="font-bold num-mono text-gray-200 mt-0.5">-</div>
-                            </div>
-                            <div class="bg-sbi-dark/60 p-2 rounded border border-sbi-border">
-                                <div class="text-gray-400">高値</div>
-                                <div id="info-high" class="font-bold num-mono text-sbi-up mt-0.5">-</div>
-                            </div>
-                            <div class="bg-sbi-dark/60 p-2 rounded border border-sbi-border">
-                                <div class="text-gray-400">安値</div>
-                                <div id="info-low" class="font-bold num-mono text-sbi-down mt-0.5">-</div>
-                            </div>
-                            <div class="bg-sbi-dark/60 p-2 rounded border border-sbi-border">
-                                <div class="text-gray-400">出来高</div>
-                                <div id="info-vol" class="font-bold num-mono text-gray-200 mt-0.5">-</div>
-                            </div>
-                        </div>
+                    </div>
+                    <div class="text-xs text-slate-400 flex gap-3">
+                        <div>始値: <span id="trade-stock-open" class="text-white font-mono">0</span></div>
+                        <div>高値: <span id="trade-stock-high" class="text-white font-mono">0</span></div>
+                        <div>安値: <span id="trade-stock-low" class="text-white font-mono">0</span></div>
                     </div>
                 </div>
 
-                <!-- Order Book (板情報 - 3 cols) -->
-                <div class="lg:col-span-3">
-                    <div class="bg-sbi-card border border-sbi-border rounded-xl p-3 h-full flex flex-col">
-                        <h3 class="font-bold text-white mb-2 text-center text-xs tracking-wider border-b border-sbi-border pb-2">
-                            気配値情報（10本リアルタイム板）
-                        </h3>
-                        <div class="flex-1 overflow-hidden">
-                            <table class="w-full text-xs text-center border-collapse">
+                <!-- Canvasローソク足・テクニカルチャート -->
+                <div class="bg-sbi-card p-4 rounded-xl border border-sbi-border shadow flex flex-col gap-2">
+                    <div class="flex justify-between items-center text-xs text-slate-400">
+                        <span class="font-bold text-slate-200">リアルタイム テクニカルチャート</span>
+                        <div class="flex gap-3">
+                            <span class="flex items-center gap-1"><span class="w-2.5 h-0.5 bg-yellow-400 inline-block"></span> 5SMA</span>
+                            <span class="flex items-center gap-1"><span class="w-2.5 h-0.5 bg-purple-400 inline-block"></span> 10SMA</span>
+                        </div>
+                    </div>
+                    <div class="w-full h-64 relative bg-slate-950 rounded-lg overflow-hidden border border-slate-800">
+                        <canvas id="stock-chart" class="w-full h-full block"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右エリア: 板情報（気配値） & 注文入力 (5列) -->
+            <div class="lg:col-span-5 flex flex-col gap-4">
+                <!-- 注文入力パネル & 板情報の2カラム分割 -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- 板情報（気配値） -->
+                    <div class="bg-sbi-card p-3 rounded-xl border border-sbi-border shadow flex flex-col">
+                        <div class="text-xs font-bold text-slate-300 pb-2 border-b border-slate-700 flex justify-between">
+                            <span>板情報 (10本気配)</span>
+                            <span class="text-[10px] text-slate-500 font-normal">単位: 100株</span>
+                        </div>
+                        <div class="flex-1 overflow-hidden mt-1">
+                            <table class="w-full text-[11px] font-mono select-none">
                                 <thead>
-                                    <tr class="text-gray-400 bg-sbi-dark/70 border-b border-sbi-border">
-                                        <th class="py-1.5 font-normal w-1/3">売株数</th>
-                                        <th class="py-1.5 font-normal w-1/3">気配値</th>
-                                        <th class="py-1.5 font-normal w-1/3">買株数</th>
+                                    <tr class="text-slate-500 border-b border-slate-800">
+                                        <th class="text-left w-1/3 py-0.5">売気配</th>
+                                        <th class="text-center w-1/3 py-0.5">気配値</th>
+                                        <th class="text-right w-1/3 py-0.5">買気配</th>
                                     </tr>
                                 </thead>
-                                <tbody id="board-tbody" class="divide-y divide-sbi-border/30 num-mono">
-                                    <!-- Dynamic Ita Rows -->
+                                <tbody id="order-book-body">
+                                    <!-- JSで10本板生成 -->
                                 </tbody>
                             </table>
                         </div>
                     </div>
-                </div>
 
-                <!-- Detailed Order Ticket (4 cols) -->
-                <div class="lg:col-span-4">
-                    <div class="bg-sbi-card border border-sbi-border rounded-xl p-4">
-                        <h3 class="font-bold text-white mb-4 flex items-center gap-2">
-                            <span class="w-1.5 h-4 bg-sbi-accent rounded"></span> 注文発注パネル（特殊執行対応）
-                        </h3>
-                        <form id="order-form" onsubmit="handleUserOrderSubmit(event)" class="space-y-3">
-                            
-                            <!-- Side Selection (BUY / SELL) -->
-                            <div class="grid grid-cols-2 gap-2 p-1 bg-sbi-dark rounded-lg border border-sbi-border">
-                                <label class="cursor-pointer text-center py-2 rounded-md font-bold transition flex items-center justify-center gap-1">
-                                    <input type="radio" name="side" value="BUY" checked onclick="updateOrderUI()" class="hidden">
-                                    <span id="side-buy-label" class="w-full py-1 rounded bg-sbi-up text-white shadow-sm">現物買</span>
+                    <!-- 注文フォーム -->
+                    <div class="bg-sbi-card p-4 rounded-xl border border-sbi-border shadow flex flex-col justify-between space-y-3">
+                        <div class="text-xs font-bold text-white border-b border-slate-700 pb-2">注文発注パネル</div>
+
+                        <form id="order-form" onsubmit="handleOrderSubmit(event)" class="space-y-3 text-xs">
+                            <!-- 売買区分選択 -->
+                            <div class="grid grid-cols-2 gap-2">
+                                <label class="cursor-pointer">
+                                    <input type="radio" name="side" value="buy" checked onchange="updateOrderFormUI()" class="peer hidden">
+                                    <div class="w-full text-center py-2 rounded-lg font-bold border border-slate-700 peer-checked:border-red-500 peer-checked:bg-red-500/20 peer-checked:text-red-400 text-slate-400 transition">現物買</div>
                                 </label>
-                                <label class="cursor-pointer text-center py-2 rounded-md font-bold transition flex items-center justify-center gap-1">
-                                    <input type="radio" name="side" value="SELL" onclick="updateOrderUI()" class="hidden">
-                                    <span id="side-sell-label" class="w-full py-1 rounded text-gray-400 hover:text-white">現物売</span>
+                                <label class="cursor-pointer">
+                                    <input type="radio" name="side" value="sell" onchange="updateOrderFormUI()" class="peer hidden">
+                                    <div class="w-full text-center py-2 rounded-lg font-bold border border-slate-700 peer-checked:border-emerald-500 peer-checked:bg-emerald-500/20 peer-checked:text-emerald-400 text-slate-400 transition">現物売</div>
                                 </label>
                             </div>
 
-                            <!-- Account Type -->
-                            <div class="flex items-center gap-4 bg-sbi-dark/50 p-2.5 rounded-lg border border-sbi-border">
-                                <span class="text-gray-400 w-20 font-medium">預り区分:</span>
-                                <label class="flex items-center gap-1.5 cursor-pointer">
-                                    <input type="radio" name="account" value="特定" checked class="accent-sbi-accent"> 特定預り
-                                </label>
-                                <label class="flex items-center gap-1.5 cursor-pointer">
-                                    <input type="radio" name="account" value="一般" class="accent-sbi-accent"> 一般預り
-                                </label>
-                            </div>
-
-                            <!-- Quantity Input -->
-                            <div class="flex items-center gap-2 bg-sbi-dark/50 p-2.5 rounded-lg border border-sbi-border">
-                                <label class="text-gray-400 w-20 font-medium">注文数量:</label>
-                                <input type="number" id="order-qty" value="100" step="100" min="100" class="flex-1 bg-sbi-dark border border-sbi-border rounded px-3 py-1 num-mono text-white focus:outline-none focus:border-sbi-accent" required>
-                                <span class="text-gray-400">株</span>
-                            </div>
-
-                            <!-- Condition Selection -->
-                            <div class="flex items-center gap-2 bg-sbi-dark/50 p-2.5 rounded-lg border border-sbi-border">
-                                <label class="text-gray-400 w-20 font-medium">執行条件:</label>
-                                <select id="order-condition" onchange="updateOrderUI()" class="flex-1 bg-sbi-dark border border-sbi-border rounded px-3 py-1 text-white focus:outline-none focus:border-sbi-accent">
-                                    <option value="MARKET">成行（Market）</option>
-                                    <option value="LIMIT">指値（Limit）</option>
-                                    <option value="STOP">逆指値（Stop Order）</option>
+                            <!-- 執行条件 -->
+                            <div>
+                                <label class="text-slate-400 block mb-1">執行条件</label>
+                                <select id="order-type" onchange="updateOrderFormUI()" class="w-full bg-slate-900 border border-slate-700 text-white rounded p-1.5 focus:outline-none">
+                                    <option value="market">成行</option>
+                                    <option value="limit">指値</option>
+                                    <option value="stop">逆指値 (ストップ)</option>
                                 </select>
                             </div>
 
-                            <!-- Limit Price Input Row -->
-                            <div id="row-limit-price" class="hidden flex items-center gap-2 bg-sbi-dark/50 p-2.5 rounded-lg border border-sbi-border">
-                                <label class="text-gray-400 w-20 font-medium">指値単価:</label>
-                                <input type="number" id="order-limit-price" placeholder="円" class="flex-1 bg-sbi-dark border border-sbi-border rounded px-3 py-1 num-mono text-white focus:outline-none focus:border-sbi-accent">
-                                <span class="text-gray-400">円</span>
+                            <!-- 価格・トリガー価格入力 (動的) -->
+                            <div id="price-input-container" class="hidden">
+                                <label id="price-label" class="text-slate-400 block mb-1">指値価格 (円)</label>
+                                <input type="number" id="order-price" placeholder="例: 2500" class="w-full bg-slate-900 border border-slate-700 text-white font-mono p-1.5 rounded focus:outline-none">
                             </div>
 
-                            <!-- Stop Trigger Container -->
-                            <div id="row-stop-container" class="hidden space-y-2 bg-amber-500/10 border border-amber-500/30 p-3 rounded-lg">
-                                <div class="text-xs text-amber-300 font-bold">⚠️ 逆指値トリガー設定</div>
-                                <div class="flex items-center gap-2">
-                                    <span class="text-gray-300 text-xs">現在値が</span>
-                                    <input type="number" id="order-trigger-price" placeholder="トリガー価格" class="w-28 bg-sbi-dark border border-sbi-border rounded px-2 py-1 num-mono text-white text-xs">
-                                    <span id="trigger-type-label" class="text-gray-300 text-xs">以上で</span>
+                            <!-- 注文数量 -->
+                            <div>
+                                <label class="text-slate-400 block mb-1">株数 (100株単位)</label>
+                                <input type="number" id="order-qty" value="100" min="100" step="100" required class="w-full bg-slate-900 border border-slate-700 text-white font-mono p-1.5 rounded focus:outline-none">
+                            </div>
+
+                            <!-- 預り区分 / 有効期限 -->
+                            <div class="grid grid-cols-2 gap-2 text-[11px]">
+                                <div>
+                                    <label class="text-slate-400 block mb-1">預り区分</label>
+                                    <select id="account-type" class="w-full bg-slate-900 border border-slate-700 text-white rounded p-1">
+                                        <option value="tokutei">特定</option>
+                                        <option value="ippan">一般</option>
+                                    </select>
                                 </div>
-                                <div class="text-xs text-gray-400">発注執行: <span class="text-white font-medium">成行注文</span></div>
-                            </div>
-
-                            <!-- Expiry Selection -->
-                            <div class="flex items-center gap-2 bg-sbi-dark/50 p-2.5 rounded-lg border border-sbi-border">
-                                <label class="text-gray-400 w-20 font-medium">有効期限:</label>
-                                <div class="flex gap-4">
-                                    <label class="flex items-center gap-1 cursor-pointer">
-                                        <input type="radio" name="expire" value="DAY" checked class="accent-sbi-accent"> 当日中（5更新で自動失効）
-                                    </label>
-                                    <label class="flex items-center gap-1 cursor-pointer">
-                                        <input type="radio" name="expire" value="WEEK" class="accent-sbi-accent"> 今週中
-                                    </label>
+                                <div>
+                                    <label class="text-slate-400 block mb-1">有効期限</label>
+                                    <select id="order-expiry" class="w-full bg-slate-900 border border-slate-700 text-white rounded p-1">
+                                        <option value="day">当日中</option>
+                                        <option value="week">今週中</option>
+                                    </select>
                                 </div>
                             </div>
 
-                            <!-- Password Input -->
-                            <div class="flex items-center gap-2 bg-sbi-dark/50 p-2.5 rounded-lg border border-sbi-border">
-                                <label class="text-rose-400 w-20 font-medium">取引パス:</label>
-                                <input type="password" id="order-pass" placeholder="取引パス入力（模擬）" class="flex-1 bg-sbi-dark border border-sbi-border rounded px-3 py-1 text-white focus:outline-none focus:border-sbi-accent" required>
+                            <!-- 取引パスワード -->
+                            <div>
+                                <label class="text-slate-400 block mb-1">取引パスワード (検証用)</label>
+                                <input type="password" id="trade-pass" placeholder="取引パス入力（模擬）" class="w-full bg-slate-900 border border-slate-700 text-white p-1.5 rounded focus:outline-none">
                             </div>
 
-                            <!-- Submit Button -->
-                            <button type="submit" id="order-submit-btn" class="w-full bg-sbi-up hover:bg-red-600 text-white font-bold py-3 rounded-lg shadow-lg transition duration-150">
-                                現物買い発注確認
+                            <button type="submit" id="order-submit-btn" class="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-2.5 rounded-lg shadow transition">
+                                買い注文発注
                             </button>
                         </form>
                     </div>
                 </div>
-
             </div>
         </div>
 
-        <!-- 3. PORTFOLIO TAB -->
-        <div id="page-portfolio" class="page-content hidden space-y-4">
-            <div class="bg-sbi-card border border-sbi-border rounded-xl p-4">
-                <h3 class="text-base font-bold text-white mb-3 flex items-center gap-2">
-                    <span class="w-1.5 h-4 bg-sbi-accent rounded"></span> 保有資産明細 (ポートフォリオ)
-                </h3>
+        <!-- 3. 保有資産（ポートフォリオ）タブ -->
+        <div id="tab-portfolio" class="tab-page hidden space-y-4">
+            <div class="bg-sbi-card p-5 rounded-xl border border-sbi-border shadow space-y-3">
+                <div class="flex justify-between items-center border-b border-slate-700 pb-2">
+                    <h2 class="font-bold text-base text-white">保有株式一覧</h2>
+                    <div class="text-xs text-slate-400">銘柄数: <span id="portfolio-count" class="text-white font-bold">0</span></div>
+                </div>
+
                 <div class="overflow-x-auto">
-                    <table class="w-full text-left border-collapse">
+                    <table class="w-full text-xs">
                         <thead>
-                            <tr class="border-b border-sbi-border text-gray-400 text-xs bg-sbi-dark/50">
-                                <th class="py-2.5 px-3">銘柄コード</th>
-                                <th class="py-2.5 px-3">銘柄名</th>
-                                <th class="py-2.5 px-3">預り区分</th>
-                                <th class="py-2.5 px-3 text-right">保有株数</th>
-                                <th class="py-2.5 px-3 text-right">取得単価</th>
-                                <th class="py-2.5 px-3 text-right">現在値</th>
-                                <th class="py-2.5 px-3 text-right">評価額</th>
-                                <th class="py-2.5 px-3 text-right">評価損益(円)</th>
-                                <th class="py-2.5 px-3 text-right">損益率(%)</th>
-                                <th class="py-2.5 px-3 text-center">即時決済</th>
+                            <tr class="text-slate-400 border-b border-slate-700">
+                                <th class="py-2.5 text-left">銘柄名(コード)</th>
+                                <th class="py-2.5 text-center">預り</th>
+                                <th class="py-2.5 text-right">保有株数</th>
+                                <th class="py-2.5 text-right">取得単価</th>
+                                <th class="py-2.5 text-right">現在値</th>
+                                <th class="py-2.5 text-right">評価額</th>
+                                <th class="py-2.5 text-right">評価損益</th>
+                                <th class="py-2.5 text-center">操作</th>
                             </tr>
                         </thead>
-                        <tbody id="portfolio-table-body" class="divide-y divide-sbi-border/50 text-xs">
-                            <!-- Dynamic -->
+                        <tbody id="portfolio-table-body" class="divide-y divide-slate-800">
+                            <!-- JSで生成 -->
                         </tbody>
                     </table>
                 </div>
             </div>
         </div>
 
-        <!-- 4. ORDERS & ALGO ANALYSIS TAB -->
-        <div id="page-orders" class="page-content hidden space-y-4">
-            <!-- Algo Strategy Config Panel -->
-            <div class="bg-sbi-card border border-sbi-border rounded-xl p-4">
-                <h3 class="text-base font-bold text-white mb-3 flex items-center gap-2">
-                    <span class="w-1.5 h-4 bg-indigo-500 rounded"></span> アルゴリズム（自動売買ロボ）自律戦略パラメータ設定
-                </h3>
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
-                    <div class="bg-sbi-dark p-3 rounded-lg border border-sbi-border">
-                        <label class="text-gray-400 block mb-1 font-medium">短期移動平均 (SMA)</label>
-                        <input type="number" id="algo-param-sma-short" value="5" class="w-full bg-sbi-card border border-sbi-border rounded px-2 py-1 text-white num-mono">
-                    </div>
-                    <div class="bg-sbi-dark p-3 rounded-lg border border-sbi-border">
-                        <label class="text-gray-400 block mb-1 font-medium">中期移動平均 (SMA)</label>
-                        <input type="number" id="algo-param-sma-long" value="10" class="w-full bg-sbi-card border border-sbi-border rounded px-2 py-1 text-white num-mono">
-                    </div>
-                    <div class="bg-sbi-dark p-3 rounded-lg border border-sbi-border">
-                        <label class="text-gray-400 block mb-1 font-medium">損切り閾値 (% Line)</label>
-                        <input type="number" id="algo-param-stoploss" value="-2.0" step="0.5" class="w-full bg-sbi-card border border-sbi-border rounded px-2 py-1 text-white num-mono">
-                    </div>
-                    <div class="bg-sbi-dark p-3 rounded-lg border border-sbi-border flex items-end">
-                        <button onclick="applyAlgoParams()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-1.5 rounded transition">
-                            設定保存＆アルゴ更新
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Orders Log Table -->
-            <div class="bg-sbi-card border border-sbi-border rounded-xl p-4">
-                <h3 class="text-base font-bold text-white mb-3 flex items-center gap-2">
-                    <span class="w-1.5 h-4 bg-sbi-accent rounded"></span> 全注文ステータス・板マッチング履歴
-                </h3>
+        <!-- 4. 注文一覧・ロボログタブ -->
+        <div id="tab-orders" class="tab-page hidden space-y-4">
+            <!-- 全注文ステータステーブル -->
+            <div class="bg-sbi-card p-5 rounded-xl border border-sbi-border shadow space-y-3">
+                <h2 class="font-bold text-base text-white border-b border-slate-700 pb-2">全注文履歴・マッチング状態</h2>
                 <div class="overflow-x-auto">
-                    <table class="w-full text-left border-collapse">
+                    <table class="w-full text-xs">
                         <thead>
-                            <tr class="border-b border-sbi-border text-gray-400 text-xs bg-sbi-dark/50">
-                                <th class="py-2.5 px-3">注文ID</th>
-                                <th class="py-2.5 px-3">時刻</th>
-                                <th class="py-2.5 px-3">銘柄</th>
-                                <th class="py-2.5 px-3">売買</th>
-                                <th class="py-2.5 px-3">預り</th>
-                                <th class="py-2.5 px-3">条件</th>
-                                <th class="py-2.5 px-3 text-right">数量</th>
-                                <th class="py-2.5 px-3 text-right">単価 / トリガー</th>
-                                <th class="py-2.5 px-3 text-center">ステータス</th>
-                                <th class="py-2.5 px-3 text-center">発注元</th>
-                                <th class="py-2.5 px-3 text-center">操作</th>
+                            <tr class="text-slate-400 border-b border-slate-700">
+                                <th class="py-2 text-left">注文ID</th>
+                                <th class="py-2 text-left">日時</th>
+                                <th class="py-2 text-left">銘柄</th>
+                                <th class="py-2 text-center">売買</th>
+                                <th class="py-2 text-center">条件</th>
+                                <th class="py-2 text-right">数量</th>
+                                <th class="py-2 text-right">注文/トリガー</th>
+                                <th class="py-2 text-center">ステータス</th>
+                                <th class="py-2 text-center">発注元</th>
                             </tr>
                         </thead>
-                        <tbody id="orders-table-body" class="divide-y divide-sbi-border/50 text-xs">
-                            <!-- Dynamic -->
+                        <tbody id="orders-table-body" class="divide-y divide-slate-800">
+                            <!-- JS生成 -->
                         </tbody>
                     </table>
                 </div>
             </div>
 
-            <!-- Console Log Panel -->
-            <div class="bg-sbi-card border border-sbi-border rounded-xl p-4">
-                <h3 class="text-base font-bold text-white mb-2 flex items-center gap-2">
-                    <span class="w-1.5 h-4 bg-emerald-500 rounded"></span> アルゴリズム思考 & システムコンソールログ
-                </h3>
-                <div id="robot-console-log" class="bg-black/80 rounded-lg p-3 font-mono text-emerald-400 text-xs h-56 overflow-y-auto leading-relaxed border border-emerald-900/50">
-                    [SYSTEM] SBI Securities Algo Matching Engine initialized...<br>
+            <!-- ロボット思考・判断コンソール -->
+            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 shadow font-mono text-xs text-emerald-400 space-y-2">
+                <div class="flex justify-between items-center border-b border-slate-800 pb-1 text-slate-400 font-sans">
+                    <span>🤖 アルゴリズム売買実行ログ・判断理由</span>
+                    <button onclick="clearAlgoLogs()" class="text-[11px] text-slate-500 hover:text-slate-300">ログ消去</button>
+                </div>
+                <div id="algo-log-console" class="h-48 overflow-y-auto space-y-1 pr-2">
+                    <div class="text-slate-600">[システム] ロギングエンジン初期化完了...</div>
                 </div>
             </div>
         </div>
 
     </main>
 
-    <!-- Notification Toast Container -->
-    <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2"></div>
-
-    <!-- Custom Modal Overlay -->
-    <div id="custom-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
-        <div class="bg-sbi-card border border-sbi-border rounded-xl p-5 max-w-sm w-full shadow-2xl">
-            <h4 id="modal-title" class="text-lg font-bold text-white mb-2">通知</h4>
-            <p id="modal-message" class="text-gray-300 text-xs leading-relaxed mb-4"></p>
-            <div class="text-right">
-                <button onclick="closeModal()" class="bg-sbi-accent hover:bg-sbi-accentHover text-white font-bold px-4 py-1.5 rounded transition text-xs">
-                    了解
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Application Script -->
+    <!-- JavaScriptロジック -->
     <script>
-        /**
-         * State Architecture Management
-         */
+        // ==========================================
+        // 1. グローバルアプリケーション状態 (AppState)
+        // ==========================================
         const AppState = {
-            userCash: 1500000,
-            robotCash: 1500000,
-            robotActive: true,
-            selectedStockCode: "7203",
-            
-            // Stock Data Definition & Dynamic State
+            cash: 3000000,           // 初期買付余力
+            robotBudget: 1500000,    // ロボ専用枠
+            robotActive: false,      // ロボ動作フラグ
+            selectedStockCode: '7203',
             stocks: {
-                "7203": { name: "トヨタ自動車", price: 2600, open: 2580, high: 2620, low: 2570, vol: 1420000, tick: 1, history: [], lastPrice: 2600 },
-                "6758": { name: "ソニーグループ", price: 13500, open: 13400, high: 13650, low: 13350, vol: 890000, tick: 5, history: [], lastPrice: 13500 },
-                "8306": { name: "三菱UFJ FG", price: 1700, open: 1690, high: 1715, low: 1685, vol: 3500000, tick: 1, history: [], lastPrice: 1700 },
-                "7974": { name: "任天堂", price: 7800, open: 7750, high: 7890, low: 7710, vol: 620000, tick: 10, history: [], lastPrice: 7800 }
+                '7203': { name: 'トヨタ自動車', symbol: '7203.T', price: 2600, open: 2600, high: 2600, low: 2600, history: [2600] },
+                '6758': { name: 'ソニーグループ', symbol: '6758.T', price: 13500, open: 13500, high: 13500, low: 13500, history: [13500] },
+                '8306': { name: '三菱UFJフィナンシャルG', symbol: '8306.T', price: 1700, open: 1700, high: 1700, low: 1700, history: [1700] },
+                '7974': { name: '任天堂', symbol: '7974.T', price: 7800, open: 7800, high: 7800, low: 7800, history: [7800] },
+                'AAPL': { name: 'アップル', symbol: 'AAPL', price: 28000, open: 28000, high: 28000, low: 28000, history: [28000] }
             },
-
-            // Algo Parameters
-            algoParams: {
-                smaShort: 5,
-                smaLong: 10,
-                stopLossPct: -2.0
-            },
-
-            // Portfolio Items
-            portfolio: [],
-
-            // Order History
-            orders: [],
-
-            // Robot Logs
-            robotLogs: []
+            portfolio: [],  // { id, code, qty, avgPrice, accountType }
+            orders: [],     // { id, time, code, side, type, price, qty, status, origin, accountType }
+            algoLogs: []
         };
 
-        let orderIdCounter = 5001;
-        let audioCtx = null;
+        let orderIdCounter = 1001;
 
-        // Sound Feedback Generator (Web Audio API)
-        function playExecutionChime() {
+        // Web Audio API (約定通知サウンド)
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playChime() {
             try {
-                if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                 if (audioCtx.state === 'suspended') audioCtx.resume();
-                
                 const osc = audioCtx.createOscillator();
                 const gain = audioCtx.createGain();
                 osc.type = 'sine';
                 osc.frequency.setValueAtTime(880, audioCtx.currentTime); // A5
-                gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
+                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.2);
                 osc.connect(gain);
                 gain.connect(audioCtx.destination);
                 osc.start();
                 osc.stop(audioCtx.currentTime + 0.2);
-            } catch (e) {}
+            } catch(e){}
         }
 
-        // Custom Modal Control
-        function showAlert(msg, title = "確認") {
-            document.getElementById('modal-title').innerText = title;
-            document.getElementById('modal-message').innerText = msg;
-            document.getElementById('custom-modal').classList.remove('hidden');
-            document.getElementById('custom-modal').classList.add('flex');
-        }
-
-        function closeModal() {
-            document.getElementById('custom-modal').classList.add('hidden');
-            document.getElementById('custom-modal').classList.remove('flex');
-        }
-
-        // Toast Notifications
-        function showToast(title, body) {
-            const container = document.getElementById('toast-container');
-            const toast = document.createElement('div');
-            toast.className = 'bg-sbi-card border border-sbi-accent text-white p-3 rounded-lg shadow-xl text-xs min-w-[260px] animate-bounce';
-            toast.innerHTML = `<div class="font-bold text-sbi-accent flex items-center gap-1">🔔 ${title}</div><div class="text-gray-300 mt-1">${body}</div>`;
-            container.appendChild(toast);
-            playExecutionChime();
-            setTimeout(() => toast.remove(), 3200);
-        }
-
-        // Navigation Tab Switching Logic
-        function switchTab(tabId) {
-            document.querySelectorAll('.nav-tab').forEach(el => {
-                el.classList.remove('active', 'border-sbi-accent', 'text-sbi-accent', 'bg-sbi-card');
-                el.classList.add('border-transparent', 'text-gray-400');
-            });
-            document.querySelectorAll('.page-content').forEach(el => el.classList.add('hidden'));
-
-            const selectedBtn = Array.from(document.querySelectorAll('.nav-tab')).find(el => el.getAttribute('onclick').includes(tabId));
-            if (selectedBtn) {
-                selectedBtn.classList.add('active', 'border-sbi-accent', 'text-sbi-accent', 'bg-sbi-card');
-                selectedBtn.classList.remove('border-transparent', 'text-gray-400');
-            }
-            
-            document.getElementById(`page-${tabId}`).classList.remove('hidden');
-            renderUI();
-        }
-
-        function toggleRobot() {
-            AppState.robotActive = !AppState.robotActive;
-            const el = document.getElementById('robot-status-text');
-            if (AppState.robotActive) {
-                el.innerText = "⚠️ 運用中";
-                el.className = "font-bold text-sbi-up animate-pulse";
-                addRobotLog("システム: 自動売買アルゴリズムの稼働を再開しました。");
-            } else {
-                el.innerText = "⏹ 停止中";
-                el.className = "font-bold text-gray-500";
-                addRobotLog("システム: 自動売買アルゴリズムを一時停止しました。");
-            }
-        }
-
-        function addRobotLog(text) {
-            const timeStr = new Date().toTimeString().split(' ')[0];
-            const logMsg = `[${timeStr}] ${text}`;
-            AppState.robotLogs.unshift(logMsg);
-            if (AppState.robotLogs.length > 80) AppState.robotLogs.pop();
-            
-            const consoleEl = document.getElementById('robot-console-log');
-            if (consoleEl) {
-                consoleEl.innerHTML = AppState.robotLogs.join('<br>');
-            }
-        }
-
-        function applyAlgoParams() {
-            const shortVal = parseInt(document.getElementById('algo-param-sma-short').value);
-            const longVal = parseInt(document.getElementById('algo-param-sma-long').value);
-            const stopVal = parseFloat(document.getElementById('algo-param-stoploss').value);
-
-            if (shortVal >= longVal) {
-                showAlert("短期SMAスパンは中期SMAスパンより小さい値を指定してください。");
-                return;
-            }
-
-            AppState.algoParams.smaShort = shortVal;
-            AppState.algoParams.smaLong = longVal;
-            AppState.algoParams.stopLossPct = stopVal;
-
-            addRobotLog(`パラメータ更新: 短期SMA=${shortVal}, 中期SMA=${longVal}, 損切り閾値=${stopVal}%`);
-            showToast("アルゴ設定完了", "アルゴリズムのバックテスト/執行条件パラメータを更新しました。");
-        }
-
-        // Fetching Real Prices with CORS Fallback
+        // ==========================================
+        // 2. static JSONフェッチエンジン (stock_data.json)
+        // ==========================================
         async function fetchStockPrices() {
-            let success = false;
-            for (const code of Object.keys(AppState.stocks)) {
-                const targetUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${code}.T`;
-                const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
-                
-                try {
-                    const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(2000) });
-                    if (res.ok) {
-                        const data = await res.json();
-                        const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
-                        if (price) {
-                            updateStockPriceState(code, price);
-                            success = true;
-                        }
+            let anySuccess = false;
+            let jsonUrl = `stock_data.json?t=${Date.now()}`;
+
+            // blob: や相対パス解決エラーを安全に回避
+            try {
+                if (window.location.protocol.startsWith('http')) {
+                    jsonUrl = new URL(`stock_data.json?t=${Date.now()}`, window.location.href).href;
+                }
+            } catch (e) {
+                jsonUrl = `stock_data.json?t=${Date.now()}`;
+            }
+
+            try {
+                const res = await fetch(jsonUrl, { cache: 'no-store' }).catch(() => null);
+                if (res && res.ok) {
+                    const data = await res.json();
+                    if (data && data.stocks) {
+                        Object.keys(AppState.stocks).forEach(code => {
+                            const symbol = AppState.stocks[code].symbol;
+                            const stockInfo = data.stocks[symbol];
+                            if (stockInfo) {
+                                const price = stockInfo.price;
+                                const st = AppState.stocks[code];
+                                st.open = Math.round(price - stockInfo.change);
+                                st.high = stockInfo.high;
+                                st.low = stockInfo.low;
+                                updateStockPriceState(code, price);
+                                anySuccess = true;
+                            }
+                        });
                     }
-                } catch (err) {}
+                }
+            } catch (err) {
+                // サイレントフォールバック
             }
 
             const labelEl = document.getElementById('data-source-label');
-            if (!success) {
-                labelEl.innerText = "擬似リアルタイム (サイン波駆動)";
-                labelEl.className = "font-medium text-amber-400";
-                simulateFallbackPrices();
+            if (anySuccess) {
+                if (labelEl) {
+                    labelEl.innerText = "stock_data.json (GitHub Actions自動更新)";
+                    labelEl.className = "font-bold text-emerald-400";
+                }
             } else {
-                labelEl.innerText = "Yahoo Finance (CORS Live)";
-                labelEl.className = "font-medium text-emerald-400";
+                if (labelEl) {
+                    labelEl.innerText = "擬似バックアップ駆動中 (stock_data.json未配置/待機中)";
+                    labelEl.className = "font-bold text-amber-400";
+                }
+                simulateFallbackPrices();
             }
             
             runMatchingEngine();
-            if (AppState.robotActive) {
-                runAlgorithmicTradingLogic();
-            }
+            if (AppState.robotActive) runAlgorithmicTradingLogic();
             renderUI();
         }
 
+        // ネットワーク障害・ファイル未配置時の自動サイン波フォールバック
         function simulateFallbackPrices() {
-            Object.keys(AppState.stocks).forEach(code => {
-                const stock = AppState.stocks[code];
-                const changePct = (Math.sin(Date.now() / 2500 + parseInt(code)) * 0.006) + ((Math.random() - 0.49) * 0.01);
-                let newPrice = Math.round(stock.price * (1 + changePct));
-                newPrice = Math.round(newPrice / stock.tick) * stock.tick;
+            for (const code of Object.keys(AppState.stocks)) {
+                const st = AppState.stocks[code];
+                const changePercent = (Math.random() * 0.02) - 0.0095; // -0.95% 〜 +1.05%
+                let newPrice = Math.round(st.price * (1 + changePercent));
+                if (newPrice < 10) newPrice = 10;
+                st.high = Math.max(st.high, newPrice);
+                st.low = Math.min(st.low, newPrice);
                 updateStockPriceState(code, newPrice);
-            });
+            }
         }
 
         function updateStockPriceState(code, newPrice) {
-            const stock = AppState.stocks[code];
-            stock.lastPrice = stock.price;
-            stock.price = newPrice;
-            if (newPrice > stock.high) stock.high = newPrice;
-            if (newPrice < stock.low) stock.low = newPrice;
-            stock.vol += Math.floor(Math.random() * 400) + 100;
+            const st = AppState.stocks[code];
+            st.price = newPrice;
+            st.history.push(newPrice);
+            if (st.history.length > 30) st.history.shift(); // チャート用30件保持
+        }
 
-            stock.history.push(newPrice);
-            if (stock.history.length > 25) {
-                stock.history.shift();
+        // ==========================================
+        // 3. マッチング（約定）エンジン
+        // ==========================================
+        function runMatchingEngine() {
+            AppState.orders.forEach(order => {
+                if (order.status !== '注文中') return;
+
+                const currentPrice = AppState.stocks[order.code].price;
+                let executed = false;
+
+                if (order.type === 'market') {
+                    executed = true; // 成行は即座に現在値で約定
+                } else if (order.type === 'limit') {
+                    if (order.side === 'buy' && currentPrice <= order.price) executed = true;
+                    if (order.side === 'sell' && currentPrice >= order.price) executed = true;
+                } else if (order.type === 'stop') {
+                    if (order.side === 'buy' && currentPrice >= order.price) executed = true;
+                    if (order.side === 'sell' && currentPrice <= order.price) executed = true;
+                }
+
+                if (executed) {
+                    executeOrder(order, currentPrice);
+                }
+            });
+        }
+
+        function executeOrder(order, execPrice) {
+            order.status = '約定';
+            const totalCost = execPrice * order.qty;
+
+            if (order.side === 'buy') {
+                // ポートフォリオ追加または平均単価更新
+                const existing = AppState.portfolio.find(p => p.code === order.code && p.accountType === order.accountType);
+                if (existing) {
+                    const newQty = existing.qty + order.qty;
+                    existing.avgPrice = Math.round(((existing.qty * existing.avgPrice) + (order.qty * execPrice)) / newQty);
+                    existing.qty = newQty;
+                } else {
+                    AppState.portfolio.push({
+                        id: 'P-' + Math.floor(Math.random() * 8999 + 1000),
+                        code: order.code,
+                        qty: order.qty,
+                        avgPrice: execPrice,
+                        accountType: order.accountType
+                    });
+                }
+                AppState.cash -= totalCost;
+            } else {
+                // 売り処理
+                const existing = AppState.portfolio.find(p => p.code === order.code && p.accountType === order.accountType);
+                if (existing) {
+                    existing.qty -= order.qty;
+                    if (existing.qty <= 0) {
+                        AppState.portfolio = AppState.portfolio.filter(p => p !== existing);
+                    }
+                }
+                AppState.cash += totalCost;
+            }
+
+            playChime();
+            showToast(`【約定通知】 ${AppState.stocks[order.code].name} ${order.qty}株 約定単価: ¥${execPrice.toLocaleString()}`);
+        }
+
+        // ==========================================
+        // 4. アルゴリズム自動売買（ロボット）ロジック
+        // ==========================================
+        function runAlgorithmicTradingLogic() {
+            for (const code of Object.keys(AppState.stocks)) {
+                const st = AppState.stocks[code];
+                const history = st.history;
+                if (history.length < 10) continue; // 10回分データ蓄積待ち
+
+                // 5SMA & 10SMA 計算
+                const sma5 = history.slice(-5).reduce((a, b) => a + b, 0) / 5;
+                const sma10 = history.slice(-10).reduce((a, b) => a + b, 0) / 10;
+                const prevSma5 = history.slice(-6, -1).reduce((a, b) => a + b, 0) / 5;
+                const prevSma10 = history.slice(-11, -1).reduce((a, b) => a + b, 0) / 10;
+
+                // 1. ゴールデンクロス判定 (買サイン)
+                if (prevSma5 <= prevSma10 && sma5 > sma10) {
+                    const cost = st.price * 100;
+                    if (AppState.cash >= cost && cost <= AppState.robotBudget) {
+                        placeRobotOrder(code, 'buy', 'market', 0, 100, `ゴールデンクロス発生 (5SMA:${sma5.toFixed(0)} > 10SMA:${sma10.toFixed(0)})`);
+                    }
+                }
+
+                // 2. デッドクロス ＆ -2.0% 損切り判定 (売サイン)
+                const position = AppState.portfolio.find(p => p.code === code);
+                if (position) {
+                    const profitRatio = (st.price - position.avgPrice) / position.avgPrice;
+                    if (profitRatio <= -0.02) {
+                        placeRobotOrder(code, 'sell', 'market', 0, position.qty, `緊急損切りトリガー作動 (評価損益: ${(profitRatio * 100).toFixed(2)}%)`);
+                    } else if (prevSma5 >= prevSma10 && sma5 < sma10) {
+                        placeRobotOrder(code, 'sell', 'market', 0, position.qty, `デッドクロス発生に伴う利益確定/撤退`);
+                    }
+                }
             }
         }
 
-        // Render Dynamic Ita (Board)
-        function renderBoard() {
-            const stock = AppState.stocks[AppState.selectedStockCode];
-            const tbody = document.getElementById('board-tbody');
-            if (!tbody || !stock) return;
+        function placeRobotOrder(code, side, type, price, qty, reason) {
+            const now = new Date().toLocaleTimeString();
+            const newOrder = {
+                id: 'ORD-' + (orderIdCounter++),
+                time: now,
+                code: code,
+                side: side,
+                type: type,
+                price: price,
+                qty: qty,
+                status: '注文中',
+                origin: 'ロボ',
+                accountType: 'tokutei'
+            };
 
-            let html = "";
-            const currentPrice = stock.price;
-            const tick = stock.tick;
+            AppState.orders.unshift(newOrder);
+            const logText = `[${now}] 【ロボ自動発注】 ${AppState.stocks[code].name} (${code}) ${qty}株 [${side === 'buy' ? '買' : '売'}] - 理由: ${reason}`;
+            AppState.algoLogs.unshift(logText);
+            if (AppState.algoLogs.length > 100) AppState.algoLogs.pop();
+        }
 
+        // ==========================================
+        // 5. UIレンダリング & DOM操作
+        // ==========================================
+        function renderUI() {
+            // 資産計算
+            let stockValTotal = 0;
+            let profitLossTotal = 0;
+
+            AppState.portfolio.forEach(p => {
+                const currentP = AppState.stocks[p.code].price;
+                const val = currentP * p.qty;
+                const diff = (currentP - p.avgPrice) * p.qty;
+                stockValTotal += val;
+                profitLossTotal += diff;
+            });
+
+            const totalAsset = AppState.cash + stockValTotal;
+
+            // ホームサマリーの更新
+            document.getElementById('summary-total-asset').innerText = '¥' + totalAsset.toLocaleString();
+            document.getElementById('summary-cash').innerText = '¥' + AppState.cash.toLocaleString();
+            document.getElementById('summary-stock-value').innerText = '¥' + stockValTotal.toLocaleString();
+            
+            const profitLossEl = document.getElementById('summary-profit-loss');
+            const ratio = ((totalAsset - 3000000) / 3000000) * 100;
+            profitLossEl.innerText = `${profitLossTotal >= 0 ? '+' : ''}¥${profitLossTotal.toLocaleString()} (${ratio.toFixed(2)}%)`;
+            profitLossEl.className = `text-2xl font-bold mono-num ${profitLossTotal >= 0 ? 'text-red-400' : 'text-emerald-400'}`;
+
+            // ホーム株価テーブル更新
+            const homeTbody = document.getElementById('home-stock-table-body');
+            homeTbody.innerHTML = Object.keys(AppState.stocks).map(code => {
+                const st = AppState.stocks[code];
+                const diff = st.price - st.open;
+                const diffRatio = ((diff / st.open) * 100).toFixed(2);
+                const colorClass = diff >= 0 ? 'text-red-400' : 'text-emerald-400';
+                return `
+                    <tr>
+                        <td class="py-2.5 font-bold text-white">${st.name} <span class="text-slate-500 text-[11px] font-mono">(${code})</span></td>
+                        <td class="py-2.5 text-right font-mono font-bold text-white">¥${st.price.toLocaleString()}</td>
+                        <td class="py-2.5 text-right font-mono ${colorClass}">${diff >= 0 ? '+' : ''}${diff} (${diffRatio}%)</td>
+                        <td class="py-2.5 text-right font-mono text-slate-300">¥${st.high.toLocaleString()}</td>
+                        <td class="py-2.5 text-right font-mono text-slate-300">¥${st.low.toLocaleString()}</td>
+                        <td class="py-2.5 text-center">
+                            <button onclick="selectStockAndNavigate('${code}')" class="bg-sbi-accent hover:bg-blue-600 text-white text-[11px] px-2.5 py-1 rounded transition">取引へ</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            // 取引画面のヘッダー更新
+            const selSt = AppState.stocks[AppState.selectedStockCode];
+            const tradeDiff = selSt.price - selSt.open;
+            const tradeRatio = ((tradeDiff / selSt.open) * 100).toFixed(2);
+            document.getElementById('trade-stock-price-display').innerHTML = `
+                <span class="text-2xl font-bold font-mono text-white">¥${selSt.price.toLocaleString()}</span>
+                <span class="text-xs font-mono ${tradeDiff >= 0 ? 'text-red-400' : 'text-emerald-400'}">(${tradeDiff >= 0 ? '+' : ''}${tradeDiff} / ${tradeRatio}%)</span>
+            `;
+            document.getElementById('trade-stock-open').innerText = '¥' + selSt.open.toLocaleString();
+            document.getElementById('trade-stock-high').innerText = '¥' + selSt.high.toLocaleString();
+            document.getElementById('trade-stock-low').innerText = '¥' + selSt.low.toLocaleString();
+
+            renderOrderBook();
+            renderChart();
+            renderPortfolio();
+            renderOrdersTable();
+            renderAlgoLogs();
+        }
+
+        // 板情報（気配値）描画
+        function renderOrderBook() {
+            const tbody = document.getElementById('order-book-body');
+            const st = AppState.stocks[AppState.selectedStockCode];
+            const basePrice = st.price;
+            const step = (AppState.selectedStockCode === '7203' || AppState.selectedStockCode === '8306') ? 1 : 5;
+
+            let html = '';
+            // 売り気配 5本
             for (let i = 5; i >= 1; i--) {
-                const askPrice = currentPrice + (i * tick);
-                const askQty = (Math.floor(Math.sin(Date.now() / 1000 + i) * 60) + 80) * 100;
+                const p = basePrice + (i * step);
+                const qty = Math.floor(Math.random() * 80 + 1) * 100;
                 html += `
-                    <tr class="board-row text-rose-300">
-                        <td class="py-1">${askQty.toLocaleString()}</td>
-                        <td class="py-1 font-bold text-sbi-up">${askPrice.toLocaleString()}</td>
-                        <td class="py-1 text-gray-600">-</td>
-                    </tr>`;
+                    <tr class="hover:bg-slate-800/50">
+                        <td class="text-left text-slate-400 font-mono py-0.5">${qty.toLocaleString()}</td>
+                        <td class="text-center font-mono font-bold text-emerald-400 py-0.5">¥${p.toLocaleString()}</td>
+                        <td class="text-right text-slate-600 py-0.5">-</td>
+                    </tr>
+                `;
             }
 
+            // 現在値 (合致点)
             html += `
-                <tr class="bg-amber-500/20 font-bold border-y border-amber-500/40 text-white">
-                    <td class="py-1 text-gray-400 text-[10px]">OVER</td>
-                    <td class="py-1.5 text-sm text-amber-300">${currentPrice.toLocaleString()}</td>
-                    <td class="py-1 text-gray-400 text-[10px]">UNDER</td>
-                </tr>`;
+                <tr class="bg-blue-950/60 font-bold border-y border-blue-800">
+                    <td class="text-center text-blue-300 py-1" colspan="3">OVER / 現在値: ¥${basePrice.toLocaleString()} / UNDER</td>
+                </tr>
+            `;
 
+            // 買い気配 5本
             for (let i = 1; i <= 5; i++) {
-                const bidPrice = currentPrice - (i * tick);
-                const bidQty = (Math.floor(Math.cos(Date.now() / 1000 + i) * 60) + 80) * 100;
+                const p = basePrice - (i * step);
+                const qty = Math.floor(Math.random() * 80 + 1) * 100;
                 html += `
-                    <tr class="board-row text-emerald-300">
-                        <td class="py-1 text-gray-600">-</td>
-                        <td class="py-1 font-bold text-sbi-down">${bidPrice.toLocaleString()}</td>
-                        <td class="py-1">${bidQty.toLocaleString()}</td>
-                    </tr>`;
+                    <tr class="hover:bg-slate-800/50">
+                        <td class="text-left text-slate-600 py-0.5">-</td>
+                        <td class="text-center font-mono font-bold text-red-400 py-0.5">¥${p.toLocaleString()}</td>
+                        <td class="text-right text-slate-400 font-mono py-0.5">${qty.toLocaleString()}</td>
+                    </tr>
+                `;
             }
-
             tbody.innerHTML = html;
         }
 
-        // Draw Canvas Candlestick / SMA Chart
-        function drawChart() {
-            const canvas = document.getElementById('realtime-chart');
+        // HTML Canvas テクニカルチャート描画
+        function renderChart() {
+            const canvas = document.getElementById('stock-chart');
             if (!canvas) return;
             const ctx = canvas.getContext('2d');
-            const stock = AppState.stocks[AppState.selectedStockCode];
-            const history = stock.history;
-
-            // Fit canvas resolution
-            canvas.width = canvas.clientWidth;
-            canvas.height = canvas.clientHeight;
+            
+            // ディスプレイ解像度に合わせる
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = canvas.parentElement.clientHeight;
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+            const st = AppState.stocks[AppState.selectedStockCode];
+            const history = st.history;
             if (history.length < 2) return;
 
-            const min = Math.min(...history) * 0.995;
-            const max = Math.max(...history) * 1.005;
+            const max = Math.max(...history) * 1.002;
+            const min = Math.min(...history) * 0.998;
             const range = max - min || 1;
 
             const padding = 20;
-            const chartWidth = canvas.width - padding * 2;
-            const chartHeight = canvas.height - padding * 2;
+            const w = canvas.width - (padding * 2);
+            const h = canvas.height - (padding * 2);
+            const stepX = w / (history.length - 1);
 
-            // Draw Grid Lines
-            ctx.strokeStyle = '#1e2d4a';
+            // 背景グリッド描画
+            ctx.strokeStyle = '#1e293b';
             ctx.lineWidth = 1;
-            for (let i = 0; i <= 4; i++) {
-                const y = padding + (chartHeight / 4) * i;
+            for (let i = 0; i < 4; i++) {
+                const y = padding + (h / 3) * i;
                 ctx.beginPath();
                 ctx.moveTo(padding, y);
                 ctx.lineTo(canvas.width - padding, y);
                 ctx.stroke();
             }
 
-            // Calculate & Draw Price Line
-            ctx.strokeStyle = '#e2e8f0';
-            ctx.lineWidth = 2;
+            // 株価折れ線 (Main Line)
             ctx.beginPath();
-            history.forEach((val, idx) => {
-                const x = padding + (idx / (history.length - 1)) * chartWidth;
-                const y = canvas.height - padding - ((val - min) / range) * chartHeight;
+            ctx.strokeStyle = '#3b82f6';
+            ctx.lineWidth = 2;
+            history.forEach((p, idx) => {
+                const x = padding + idx * stepX;
+                const y = canvas.height - padding - ((p - min) / range) * h;
                 if (idx === 0) ctx.moveTo(x, y);
                 else ctx.lineTo(x, y);
             });
             ctx.stroke();
 
-            // Calculate 5-SMA
+            // 5SMA (Yellow Line)
             if (history.length >= 5) {
-                ctx.strokeStyle = '#38bdf8'; // Sky Blue
-                ctx.lineWidth = 1.5;
                 ctx.beginPath();
+                ctx.strokeStyle = '#eab308';
+                ctx.lineWidth = 1.5;
                 for (let i = 4; i < history.length; i++) {
-                    const slice = history.slice(i - 4, i + 1);
-                    const avg = slice.reduce((a, b) => a + b, 0) / 5;
-                    const x = padding + (i / (history.length - 1)) * chartWidth;
-                    const y = canvas.height - padding - ((avg - min) / range) * chartHeight;
+                    const avg = history.slice(i - 4, i + 1).reduce((a, b) => a + b, 0) / 5;
+                    const x = padding + i * stepX;
+                    const y = canvas.height - padding - ((avg - min) / range) * h;
                     if (i === 4) ctx.moveTo(x, y);
                     else ctx.lineTo(x, y);
                 }
                 ctx.stroke();
             }
-
-            // Calculate 10-SMA
-            if (history.length >= 10) {
-                ctx.strokeStyle = '#fbbf24'; // Amber
-                ctx.lineWidth = 1.5;
-                ctx.beginPath();
-                for (let i = 9; i < history.length; i++) {
-                    const slice = history.slice(i - 9, i + 1);
-                    const avg = slice.reduce((a, b) => a + b, 0) / 10;
-                    const x = padding + (i / (history.length - 1)) * chartWidth;
-                    const y = canvas.height - padding - ((avg - min) / range) * chartHeight;
-                    if (i === 9) ctx.moveTo(x, y);
-                    else ctx.lineTo(x, y);
-                }
-                ctx.stroke();
-            }
         }
 
-        // Trading Ticket UI Handler
+        // 保有資産テーブル描画
+        function renderPortfolio() {
+            const tbody = document.getElementById('portfolio-table-body');
+            document.getElementById('portfolio-count').innerText = AppState.portfolio.length;
+
+            if (AppState.portfolio.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" class="text-center py-6 text-slate-500">保有している株式はありません。</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = AppState.portfolio.map(p => {
+                const st = AppState.stocks[p.code];
+                const currentVal = st.price * p.qty;
+                const diff = (st.price - p.avgPrice) * p.qty;
+                const ratio = ((st.price - p.avgPrice) / p.avgPrice * 100).toFixed(2);
+                const colorClass = diff >= 0 ? 'text-red-400' : 'text-emerald-400';
+
+                return `
+                    <tr class="hover:bg-slate-800/50">
+                        <td class="py-3 font-bold text-white">${st.name} <span class="text-slate-500 font-mono">(${p.code})</span></td>
+                        <td class="py-3 text-center"><span class="bg-slate-800 text-slate-300 text-[10px] px-2 py-0.5 rounded">${p.accountType === 'tokutei' ? '特定' : '一般'}</span></td>
+                        <td class="py-3 text-right font-mono text-white">${p.qty.toLocaleString()}株</td>
+                        <td class="py-3 text-right font-mono text-slate-300">¥${p.avgPrice.toLocaleString()}</td>
+                        <td class="py-3 text-right font-mono font-bold text-white">¥${st.price.toLocaleString()}</td>
+                        <td class="py-3 text-right font-mono font-bold text-white">¥${currentVal.toLocaleString()}</td>
+                        <td class="py-3 text-right font-mono ${colorClass}">${diff >= 0 ? '+' : ''}¥${diff.toLocaleString()} (${ratio}%)</td>
+                        <td class="py-3 text-center">
+                            <button onclick="quickSell('${p.code}', ${p.qty})" class="bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] px-3 py-1 rounded transition">売却</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // 注文履歴テーブル描画
+        function renderOrdersTable() {
+            const tbody = document.getElementById('orders-table-body');
+            tbody.innerHTML = AppState.orders.map(o => {
+                const st = AppState.stocks[o.code];
+                const statusColor = o.status === '約定' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40' : 'bg-blue-500/20 text-blue-400 border-blue-500/40';
+                return `
+                    <tr class="hover:bg-slate-800/50">
+                        <td class="py-2.5 font-mono text-slate-400">${o.id}</td>
+                        <td class="py-2.5 text-slate-400">${o.time}</td>
+                        <td class="py-2.5 font-bold text-white">${st.name}</td>
+                        <td class="py-2.5 text-center font-bold ${o.side === 'buy' ? 'text-red-400' : 'text-emerald-400'}">${o.side === 'buy' ? '買' : '売'}</td>
+                        <td class="py-2.5 text-center text-slate-300">${o.type === 'market' ? '成行' : (o.type === 'limit' ? '指値' : '逆指値')}</td>
+                        <td class="py-2.5 text-right font-mono text-white">${o.qty.toLocaleString()}</td>
+                        <td class="py-2.5 text-right font-mono text-slate-300">${o.price > 0 ? '¥' + o.price.toLocaleString() : '-'}</td>
+                        <td class="py-2.5 text-center"><span class="text-[10px] px-2 py-0.5 rounded border ${statusColor}">${o.status}</span></td>
+                        <td class="py-2.5 text-center text-slate-400">${o.origin}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // アルゴログ出力描画
+        function renderAlgoLogs() {
+            const container = document.getElementById('algo-log-console');
+            container.innerHTML = AppState.algoLogs.map(log => `<div>${log}</div>`).join('');
+        }
+
+        // ==========================================
+        // 6. イベントハンドラ & フォーム制御
+        // ==========================================
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-page').forEach(el => el.classList.add('hidden'));
+            document.getElementById(tabId).classList.remove('hidden');
+
+            document.querySelectorAll('.nav-tab').forEach(btn => {
+                btn.classList.remove('text-blue-400', 'border-blue-500');
+                btn.classList.add('text-slate-400', 'border-transparent');
+            });
+            const activeBtn = document.getElementById('btn-' + tabId);
+            activeBtn.classList.remove('text-slate-400', 'border-transparent');
+            activeBtn.classList.add('text-blue-400', 'border-blue-500');
+        }
+
         function changeSelectedStock(code) {
             AppState.selectedStockCode = code;
             renderUI();
         }
 
-        function updateOrderUI() {
-            const side = document.querySelector('input[name="side"]:checked').value;
-            const cond = document.getElementById('order-condition').value;
+        function selectStockAndNavigate(code) {
+            changeSelectedStock(code);
+            document.getElementById('trade-stock-select').value = code;
+            switchTab('tab-trade');
+        }
 
-            const buyLabel = document.getElementById('side-buy-label');
-            const sellLabel = document.getElementById('side-sell-label');
+        function updateOrderFormUI() {
+            const side = document.querySelector('input[name="side"]:checked').value;
+            const type = document.getElementById('order-type').value;
+            const container = document.getElementById('price-input-container');
+            const label = document.getElementById('price-label');
             const submitBtn = document.getElementById('order-submit-btn');
 
-            if (side === 'BUY') {
-                buyLabel.className = "w-full py-1 rounded bg-sbi-up text-white shadow-sm font-bold";
-                sellLabel.className = "w-full py-1 rounded text-gray-400 hover:text-white font-bold";
-                submitBtn.className = "w-full bg-sbi-up hover:bg-red-600 text-white font-bold py-3 rounded-lg shadow-lg transition duration-150";
-                submitBtn.innerText = "現物買い発注確認";
+            if (type === 'market') {
+                container.classList.add('hidden');
             } else {
-                buyLabel.className = "w-full py-1 rounded text-gray-400 hover:text-white font-bold";
-                sellLabel.className = "w-full py-1 rounded bg-sbi-down text-white shadow-sm font-bold";
-                submitBtn.className = "w-full bg-sbi-down hover:bg-emerald-600 text-white font-bold py-3 rounded-lg shadow-lg transition duration-150";
-                submitBtn.innerText = "現物売り発注確認";
+                container.classList.remove('hidden');
+                label.innerText = type === 'limit' ? '指値価格 (円)' : 'トリガー価格 (円)';
             }
 
-            document.getElementById('row-limit-price').classList.toggle('hidden', cond !== 'LIMIT');
-            document.getElementById('row-stop-container').classList.toggle('hidden', cond !== 'STOP');
-            
-            const triggerLabel = document.getElementById('trigger-type-label');
-            if (triggerLabel) {
-                triggerLabel.innerText = (side === 'BUY') ? '以上で' : '以下で';
+            if (side === 'buy') {
+                submitBtn.innerText = '買い注文発注';
+                submitBtn.className = 'w-full bg-red-600 hover:bg-red-500 text-white font-bold py-2.5 rounded-lg shadow transition';
+            } else {
+                submitBtn.innerText = '売り注文発注';
+                submitBtn.className = 'w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-lg shadow transition';
             }
         }
 
-        function handleUserOrderSubmit(e) {
+        function handleOrderSubmit(e) {
             e.preventDefault();
-            const pass = document.getElementById('order-pass').value;
-            if (!pass || pass.trim() === "") {
-                showAlert("取引パスワードを入力してください。", "入力エラー");
+            const pass = document.getElementById('trade-pass').value;
+            if (!pass.trim()) {
+                showModal('入力エラー', '取引パスワードを入力してください (テスト用の疑似パスワードで可)。');
                 return;
             }
 
-            const code = AppState.selectedStockCode;
             const side = document.querySelector('input[name="side"]:checked').value;
-            const account = document.querySelector('input[name="account"]:checked').value;
-            const qty = parseInt(document.getElementById('order-qty').value);
-            const condition = document.getElementById('order-condition').value;
-            const expire = document.querySelector('input[name="expire"]:checked').value;
+            const type = document.getElementById('order-type').value;
+            const price = type === 'market' ? 0 : parseFloat(document.getElementById('order-price').value || 0);
+            const qty = parseInt(document.getElementById('order-qty').value, 10);
+            const accountType = document.getElementById('account-type').value;
 
-            let price = 0;
-            let triggerPrice = 0;
-            const currentPrice = AppState.stocks[code].price;
-
-            if (condition === 'LIMIT') {
-                price = parseInt(document.getElementById('order-limit-price').value);
-                if (!price || price <= 0) {
-                    showAlert("有効な指値単価を入力してください。");
-                    return;
-                }
-            } else if (condition === 'STOP') {
-                triggerPrice = parseInt(document.getElementById('order-trigger-price').value);
-                if (!triggerPrice || triggerPrice <= 0) {
-                    showAlert("有効なトリガー価格を入力してください。");
-                    return;
-                }
-            } else {
-                price = currentPrice;
+            if (type !== 'market' && price <= 0) {
+                showModal('入力エラー', '有効な価格を入力してください。');
+                return;
             }
 
-            if (side === 'BUY') {
-                const required = (condition === 'LIMIT' ? price : currentPrice) * qty;
-                if (AppState.userCash < required) {
-                    showAlert(`買付余力が不足しています。\n概算必要資金: ¥${required.toLocaleString()} / 買付余力: ¥${AppState.userCash.toLocaleString()}`);
-                    return;
-                }
-                AppState.userCash -= required;
-            } else {
-                const pos = AppState.portfolio.find(p => p.code === code && p.account === account);
-                if (!pos || pos.qty < qty) {
-                    showAlert("売却可能な保有株数が不足しています。");
-                    return;
-                }
-            }
-
+            const now = new Date().toLocaleTimeString();
             const newOrder = {
-                id: orderIdCounter++,
-                time: new Date().toTimeString().split(' ')[0],
-                code: code,
+                id: 'ORD-' + (orderIdCounter++),
+                time: now,
+                code: AppState.selectedStockCode,
                 side: side,
-                account: account,
-                condition: condition,
-                qty: qty,
+                type: type,
                 price: price,
-                triggerPrice: triggerPrice,
-                status: "注文中",
-                source: "ユーザー",
-                expire: expire,
-                tickAge: 0
+                qty: qty,
+                status: '注文中',
+                origin: 'ユーザー',
+                accountType: accountType
             };
 
             AppState.orders.unshift(newOrder);
-            showToast("注文受領", `ID: ${newOrder.id} [${AppState.stocks[code].name}] の発注を完了しました。`);
-            document.getElementById('order-pass').value = "";
+            showToast('注文を完了しました。マッチング結果を監視中...');
+            runMatchingEngine();
             renderUI();
         }
 
-        function cancelOrder(orderId) {
-            const order = AppState.orders.find(o => o.id === orderId);
-            if (!order || order.status !== "注文中") return;
-
-            order.status = "取消完了";
-            if (order.side === 'BUY') {
-                const refund = (order.condition === 'LIMIT' ? order.price : AppState.stocks[order.code].price) * order.qty;
-                if (order.source === "アルゴロボ") AppState.robotCash += refund;
-                else AppState.userCash += refund;
-            }
-            showToast("注文取消", `注文ID: ${orderId} を取り消しました。`);
-            renderUI();
-        }
-
-        // Order Matching Execution Logic
-        function runMatchingEngine() {
-            AppState.orders.forEach(order => {
-                if (order.status !== "注文中") return;
-
-                const stock = AppState.stocks[order.code];
-                const currentPrice = stock.price;
-                let executed = false;
-                let execPrice = currentPrice;
-
-                order.tickAge++;
-                if (order.expire === "DAY" && order.tickAge > 5 && order.condition !== "MARKET") {
-                    order.status = "自動失効";
-                    if (order.side === 'BUY') {
-                        const refund = (order.condition === 'LIMIT' ? order.price : currentPrice) * order.qty;
-                        if (order.source === "アルゴロボ") AppState.robotCash += refund;
-                        else AppState.userCash += refund;
-                    }
-                    addRobotLog(`系統通知: 注文ID ${order.id} (${order.code}) は当日失効期限により自動取り消しされました。`);
-                    return;
-                }
-
-                if (order.condition === 'MARKET') {
-                    executed = true;
-                    execPrice = currentPrice;
-                } else if (order.condition === 'LIMIT') {
-                    if (order.side === 'BUY' && currentPrice <= order.price) {
-                        executed = true;
-                        execPrice = order.price;
-                    } else if (order.side === 'SELL' && currentPrice >= order.price) {
-                        executed = true;
-                        execPrice = order.price;
-                    }
-                } else if (order.condition === 'STOP') {
-                    if (order.side === 'BUY' && currentPrice >= order.triggerPrice) {
-                        executed = true;
-                        execPrice = currentPrice;
-                    } else if (order.side === 'SELL' && currentPrice <= order.triggerPrice) {
-                        executed = true;
-                        execPrice = currentPrice;
-                    }
-                }
-
-                if (executed) {
-                    order.status = "全数約定";
-                    order.price = execPrice;
-
-                    if (order.side === 'BUY') {
-                        const pos = AppState.portfolio.find(p => p.code === order.code && p.account === order.account);
-                        if (pos) {
-                            const totalQty = pos.qty + order.qty;
-                            const avgPrice = Math.round(((pos.qty * pos.avgPrice) + (order.qty * execPrice)) / totalQty);
-                            pos.qty = totalQty;
-                            pos.avgPrice = avgPrice;
-                        } else {
-                            AppState.portfolio.push({
-                                code: order.code,
-                                name: stock.name,
-                                account: order.account,
-                                qty: order.qty,
-                                avgPrice: execPrice
-                            });
-                        }
-                    } else if (order.side === 'SELL') {
-                        const posIndex = AppState.portfolio.findIndex(p => p.code === order.code && p.account === order.account);
-                        if (posIndex !== -1) {
-                            const pos = AppState.portfolio[posIndex];
-                            pos.qty -= order.qty;
-                            if (pos.qty <= 0) AppState.portfolio.splice(posIndex, 1);
-                        }
-                        const proceeds = execPrice * order.qty;
-                        if (order.source === "アルゴロボ") AppState.robotCash += proceeds;
-                        else AppState.userCash += proceeds;
-                    }
-
-                    showToast("約定成立", `【${order.side === 'BUY' ? '買' : '売'}約定】${stock.name} ${order.qty}株 @ ¥${execPrice.toLocaleString()}`);
-                }
-            });
-        }
-
-        // Algo Trading Automation Core
-        function runAlgorithmicTradingLogic() {
-            const shortSpan = AppState.algoParams.smaShort;
-            const longSpan = AppState.algoParams.smaLong;
-
-            Object.keys(AppState.stocks).forEach(code => {
-                const stock = AppState.stocks[code];
-                const history = stock.history;
-
-                if (history.length < longSpan) return;
-
-                const smaShort = history.slice(-shortSpan).reduce((a, b) => a + b, 0) / shortSpan;
-                const smaLong = history.slice(-longSpan).reduce((a, b) => a + b, 0) / longSpan;
-                
-                const prevHistory = history.slice(0, -1);
-                const prevSmaShort = prevHistory.slice(-shortSpan).reduce((a, b) => a + b, 0) / shortSpan;
-                const prevSmaLong = prevHistory.slice(-longSpan).reduce((a, b) => a + b, 0) / longSpan;
-
-                // Golden Cross -> Buy Signal
-                if (prevSmaShort <= prevSmaLong && smaShort > smaLong) {
-                    const buyQty = 100;
-                    const triggerPrice = Math.round(stock.price * 1.003);
-                    const estCost = triggerPrice * buyQty;
-
-                    if (AppState.robotCash >= estCost) {
-                        AppState.robotCash -= estCost;
-                        const robotOrder = {
-                            id: orderIdCounter++,
-                            time: new Date().toTimeString().split(' ')[0],
-                            code: code,
-                            side: "BUY",
-                            account: "特定",
-                            condition: "STOP",
-                            qty: buyQty,
-                            price: 0,
-                            triggerPrice: triggerPrice,
-                            status: "注文中",
-                            source: "アルゴロボ",
-                            expire: "DAY",
-                            tickAge: 0
-                        };
-                        AppState.orders.unshift(robotOrder);
-                        addRobotLog(`【アルゴ自動発注】${stock.name}(${code}) 逆指値買 [トリガー: ${triggerPrice}円]。理由: Golden Cross (SMA${shortSpan}:${smaShort.toFixed(0)} > SMA${longSpan}:${smaLong.toFixed(0)})`);
-                    }
-                }
-
-                // Dead Cross or Stop Loss Check
-                const pos = AppState.portfolio.find(p => p.code === code);
-                if (pos) {
-                    const pnlPct = ((stock.price - pos.avgPrice) / pos.avgPrice) * 100;
-                    
-                    if (pnlPct <= AppState.algoParams.stopLossPct) {
-                        const sellOrder = {
-                            id: orderIdCounter++,
-                            time: new Date().toTimeString().split(' ')[0],
-                            code: code,
-                            side: "SELL",
-                            account: pos.account,
-                            condition: "MARKET",
-                            qty: pos.qty,
-                            price: stock.price,
-                            triggerPrice: 0,
-                            status: "注文中",
-                            source: "アルゴロボ",
-                            expire: "DAY",
-                            tickAge: 0
-                        };
-                        AppState.orders.unshift(sellOrder);
-                        addRobotLog(`【アルゴ緊急損切り】${stock.name}(${code}) ${pos.qty}株 成行売執行。理由: 損切りライン(${AppState.algoParams.stopLossPct}%)到達 (${pnlPct.toFixed(2)}%)`);
-                    }
-                    else if (prevSmaShort >= prevSmaLong && smaShort < smaLong) {
-                        const sellOrder = {
-                            id: orderIdCounter++,
-                            time: new Date().toTimeString().split(' ')[0],
-                            code: code,
-                            side: "SELL",
-                            account: pos.account,
-                            condition: "MARKET",
-                            qty: pos.qty,
-                            price: stock.price,
-                            triggerPrice: 0,
-                            status: "注文中",
-                            source: "アルゴロボ",
-                            expire: "DAY",
-                            tickAge: 0
-                        };
-                        AppState.orders.unshift(sellOrder);
-                        addRobotLog(`【アルゴ利確執行】${stock.name}(${code}) 成行売執行。理由: Dead Cross検知`);
-                    }
-                }
-            });
-        }
-
-        // Main UI Renderer
-        function renderUI() {
-            let totalPortfolioVal = 0;
-            let totalCostVal = 0;
-
-            AppState.portfolio.forEach(p => {
-                const currentPrice = AppState.stocks[p.code].price;
-                totalPortfolioVal += currentPrice * p.qty;
-                totalCostVal += p.avgPrice * p.qty;
-            });
-
-            const totalProfit = totalPortfolioVal - totalCostVal;
-            const profitPct = totalCostVal > 0 ? (totalProfit / totalCostVal) * 100 : 0;
-            const totalAssets = AppState.userCash + AppState.robotCash + totalPortfolioVal;
-
-            document.getElementById('sum-total-asset').innerText = `¥${totalAssets.toLocaleString()}`;
-            document.getElementById('sum-cash').innerText = `¥${AppState.userCash.toLocaleString()}`;
-            document.getElementById('sum-robot-cash').innerText = `¥${AppState.robotCash.toLocaleString()}`;
-            
-            const profitEl = document.getElementById('sum-profit-total');
-            profitEl.innerText = `¥${totalProfit.toLocaleString()} (${profitPct >= 0 ? '+' : ''}${profitPct.toFixed(2)}%)`;
-            profitEl.className = `text-2xl font-bold num-mono ${totalProfit >= 0 ? 'text-sbi-up' : 'text-sbi-down'}`;
-
-            // 1. Home Portfolio
-            const homePortTable = document.getElementById('home-portfolio-table');
-            if (homePortTable) {
-                if (AppState.portfolio.length === 0) {
-                    homePortTable.innerHTML = `<tr><td colspan="5" class="py-4 text-center text-gray-500">保有株はありません</td></tr>`;
-                } else {
-                    homePortTable.innerHTML = AppState.portfolio.map(p => {
-                        const curPrice = AppState.stocks[p.code].price;
-                        const pnl = (curPrice - p.avgPrice) * p.qty;
-                        return `
-                            <tr class="hover:bg-sbi-dark/40">
-                                <td class="py-2 px-3 font-medium text-white">${p.name} <span class="text-gray-500">(${p.code})</span></td>
-                                <td class="py-2 px-3 text-right num-mono">${p.qty.toLocaleString()}</td>
-                                <td class="py-2 px-3 text-right num-mono">¥${p.avgPrice.toLocaleString()}</td>
-                                <td class="py-2 px-3 text-right num-mono">¥${curPrice.toLocaleString()}</td>
-                                <td class="py-2 px-3 text-right num-mono font-bold ${pnl >= 0 ? 'text-sbi-up' : 'text-sbi-down'}">${pnl >= 0 ? '+' : ''}¥${pnl.toLocaleString()}</td>
-                            </tr>`;
-                    }).join('');
-                }
-            }
-
-            // 2. Home Ticker Table
-            const homeTickerTable = document.getElementById('home-ticker-table');
-            if (homeTickerTable) {
-                homeTickerTable.innerHTML = Object.keys(AppState.stocks).map(code => {
-                    const s = AppState.stocks[code];
-                    const diff = s.price - s.open;
-                    const diffPct = (diff / s.open) * 100;
-                    return `
-                        <tr class="hover:bg-sbi-dark/40">
-                            <td class="py-2 px-3 font-bold text-white">${code} <span class="font-normal text-gray-400">${s.name}</span></td>
-                            <td class="py-2 px-3 text-right num-mono font-bold text-base text-white">¥${s.price.toLocaleString()}</td>
-                            <td class="py-2 px-3 text-right num-mono ${diff >= 0 ? 'text-sbi-up' : 'text-sbi-down'}">${diff >= 0 ? '+' : ''}${diff}</td>
-                            <td class="py-2 px-3 text-right num-mono ${diffPct >= 0 ? 'text-sbi-up' : 'text-sbi-down'}">${diffPct >= 0 ? '+' : ''}${diffPct.toFixed(2)}%</td>
-                            <td class="py-2 px-3 text-center">
-                                <button class="bg-sbi-accent hover:bg-sbi-accentHover text-white px-3 py-1 rounded text-xs font-bold transition" onclick="changeSelectedStock('${code}'); switchTab('trade');">
-                                    トレード
-                                </button>
-                            </td>
-                        </tr>`;
-                }).join('');
-            }
-
-            // 3. Trade Stock Quick Info
-            const selectedStock = AppState.stocks[AppState.selectedStockCode];
-            const quickInfo = document.getElementById('stock-quick-info');
-            if (quickInfo) {
-                const diff = selectedStock.price - selectedStock.open;
-                quickInfo.innerHTML = `
-                    <div class="font-bold text-white text-base">${selectedStock.name} (${AppState.selectedStockCode})</div>
-                    <div class="flex items-baseline gap-2">
-                        <span class="text-gray-400 text-xs">現在値:</span>
-                        <span class="text-xl font-bold num-mono text-amber-300">¥${selectedStock.price.toLocaleString()}</span>
-                        <span class="text-xs num-mono ${diff >= 0 ? 'text-sbi-up' : 'text-sbi-down'}">(${diff >= 0 ? '+' : ''}${diff})</span>
-                    </div>
-                `;
-            }
-
-            document.getElementById('info-open').innerText = `¥${selectedStock.open.toLocaleString()}`;
-            document.getElementById('info-high').innerText = `¥${selectedStock.high.toLocaleString()}`;
-            document.getElementById('info-low').innerText = `¥${selectedStock.low.toLocaleString()}`;
-            document.getElementById('info-vol').innerText = selectedStock.vol.toLocaleString();
-
-            renderBoard();
-            drawChart();
-
-            // 4. Detailed Portfolio Table
-            const portTableBody = document.getElementById('portfolio-table-body');
-            if (portTableBody) {
-                if (AppState.portfolio.length === 0) {
-                    portTableBody.innerHTML = `<tr><td colspan="10" class="py-6 text-center text-gray-500">現在、保有している銘柄はありません。</td></tr>`;
-                } else {
-                    portTableBody.innerHTML = AppState.portfolio.map(p => {
-                        const stock = AppState.stocks[p.code];
-                        const val = stock.price * p.qty;
-                        const pnl = (stock.price - p.avgPrice) * p.qty;
-                        const pnlPct = ((stock.price - p.avgPrice) / p.avgPrice) * 100;
-                        return `
-                            <tr class="hover:bg-sbi-dark/40">
-                                <td class="py-2.5 px-3 font-mono">${p.code}</td>
-                                <td class="py-2.5 px-3 font-bold text-white">${p.name}</td>
-                                <td class="py-2.5 px-3 text-gray-400">${p.account}</td>
-                                <td class="py-2.5 px-3 text-right num-mono font-bold">${p.qty.toLocaleString()}</td>
-                                <td class="py-2.5 px-3 text-right num-mono">¥${p.avgPrice.toLocaleString()}</td>
-                                <td class="py-2.5 px-3 text-right num-mono text-white font-bold">¥${stock.price.toLocaleString()}</td>
-                                <td class="py-2.5 px-3 text-right num-mono text-gray-200">¥${val.toLocaleString()}</td>
-                                <td class="py-2.5 px-3 text-right num-mono font-bold ${pnl >= 0 ? 'text-sbi-up' : 'text-sbi-down'}">${pnl >= 0 ? '+' : ''}¥${pnl.toLocaleString()}</td>
-                                <td class="py-2.5 px-3 text-right num-mono font-bold ${pnlPct >= 0 ? 'text-sbi-up' : 'text-sbi-down'}">${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(2)}%</td>
-                                <td class="py-2.5 px-3 text-center">
-                                    <button class="bg-sbi-down hover:bg-emerald-600 text-white font-bold px-3 py-1 rounded transition text-xs" onclick="quickSell('${p.code}', '${p.account}', ${p.qty})">
-                                        売却
-                                    </button>
-                                </td>
-                            </tr>`;
-                    }).join('');
-                }
-            }
-
-            // 5. Orders Log Table
-            const ordersTableBody = document.getElementById('orders-table-body');
-            if (ordersTableBody) {
-                if (AppState.orders.length === 0) {
-                    ordersTableBody.innerHTML = `<tr><td colspan="11" class="py-6 text-center text-gray-500">注文履歴はありません。</td></tr>`;
-                } else {
-                    ordersTableBody.innerHTML = AppState.orders.map(o => {
-                        const stock = AppState.stocks[o.code];
-                        let condText = o.condition === 'MARKET' ? '成行' : (o.condition === 'LIMIT' ? '指値' : '逆指値');
-                        let priceText = o.condition === 'LIMIT' ? `¥${o.price.toLocaleString()}` : (o.condition === 'STOP' ? `Trig: ¥${o.triggerPrice.toLocaleString()}` : '成行');
-
-                        return `
-                            <tr class="hover:bg-sbi-dark/40">
-                                <td class="py-2 px-3 num-mono text-gray-400">${o.id}</td>
-                                <td class="py-2 px-3 text-gray-400">${o.time}</td>
-                                <td class="py-2 px-3 font-bold text-white">${stock.name}</td>
-                                <td class="py-2 px-3 font-bold ${o.side === 'BUY' ? 'text-sbi-up' : 'text-sbi-down'}">${o.side === 'BUY' ? '現物買' : '現物売'}</td>
-                                <td class="py-2 px-3 text-gray-400">${o.account}</td>
-                                <td class="py-2 px-3">${condText}</td>
-                                <td class="py-2 px-3 text-right num-mono font-bold">${o.qty}</td>
-                                <td class="py-2 px-3 text-right num-mono">${priceText}</td>
-                                <td class="py-2 px-3 text-center font-bold text-blue-400">${o.status}</td>
-                                <td class="py-2 px-3 text-center"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${o.source === 'アルゴロボ' ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30' : 'bg-gray-700 text-gray-300'}">${o.source}</span></td>
-                                <td class="py-2 px-3 text-center">
-                                    ${o.status === '注文中' ? `<button class="bg-gray-700 hover:bg-gray-600 text-white text-xs px-2 py-0.5 rounded" onclick="cancelOrder(${o.id})">取消</button>` : '-'}
-                                </td>
-                            </tr>`;
-                    }).join('');
-                }
-            }
-        }
-
-        function quickSell(code, account, qty) {
+        function quickSell(code, qty) {
             changeSelectedStock(code);
-            switchTab('trade');
-            const sellRadio = document.querySelectorAll('input[name="side"]')[1];
-            if (sellRadio) sellRadio.checked = true;
+            document.querySelectorAll('input[name="side"]')[1].checked = true; // 売りラジオオン
             document.getElementById('order-qty').value = qty;
-            updateOrderUI();
+            updateOrderFormUI();
+            switchTab('tab-trade');
         }
 
-        // Initialization
-        window.onload = function () {
-            Object.keys(AppState.stocks).forEach(code => {
-                const basePrice = AppState.stocks[code].price;
-                for (let i = 0; i < 15; i++) {
-                    AppState.stocks[code].history.push(basePrice + Math.floor((Math.random() - 0.5) * 15));
-                }
-            });
+        function toggleRobot() {
+            AppState.robotActive = !AppState.robotActive;
+            const btn = document.getElementById('algo-toggle-btn');
+            const txt = document.getElementById('algo-status-text');
 
-            renderUI();
-            setInterval(fetchStockPrices, 1000);
+            if (AppState.robotActive) {
+                btn.innerText = '稼働停止';
+                btn.className = 'bg-red-600 hover:bg-red-500 text-white text-xs font-bold px-4 py-2 rounded-lg transition shadow';
+                txt.innerText = '⚠️ 自動運用中';
+                txt.className = 'font-bold text-red-400 animate-pulse';
+                showToast('アルゴリズム売買ロボットが稼働を開始しました');
+            } else {
+                btn.innerText = '稼働開始';
+                btn.className = 'bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2 rounded-lg transition shadow';
+                txt.innerText = '停止中';
+                txt.className = 'font-bold text-slate-500';
+            }
+        }
+
+        function updateAlgoBudgetLabel(val) {
+            AppState.robotBudget = parseInt(val, 10);
+            document.getElementById('algo-budget-label').innerText = (val / 10000).toFixed(0) + '万円';
+        }
+
+        function clearAlgoLogs() {
+            AppState.algoLogs = [];
+            renderAlgoLogs();
+        }
+
+        function showToast(msg) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = 'bg-blue-600 text-white text-xs font-bold px-4 py-3 rounded-lg shadow-xl border border-blue-400 pointer-events-auto flex items-center gap-2 animate-bounce';
+            toast.innerHTML = `<span>🔔</span> ${msg}`;
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        function showModal(title, msg) {
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-message').innerText = msg;
+            document.getElementById('custom-modal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('custom-modal').classList.add('hidden');
+        }
+
+        // ==========================================
+        // 7. アプリケーション初期化
+        // ==========================================
+        window.onload = function() {
+            fetchStockPrices();
+            // 2秒ごとに株価フェッチ＆バックグラウンド約定ループ
+            setInterval(fetchStockPrices, 2000);
+            window.addEventListener('resize', renderChart);
         };
     </script>
 </body>
