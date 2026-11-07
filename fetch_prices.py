@@ -2,13 +2,25 @@ import json
 import datetime
 import yfinance as yf
 
-# 監視対象銘柄の定義（ティッカーシンボル -> 表示名）
+# 監視対象銘柄（拡張版：主要日本株・米国株）
 SYMBOLS = {
+    # 日本株
     "7203.T": "トヨタ自動車",
     "6758.T": "ソニーグループ",
     "8306.T": "三菱UFJフィナンシャルG",
     "7974.T": "任天堂",
-    "AAPL": "アップル"
+    "9984.T": "ソフトバンクG",
+    "8035.T": "東京エレクトロン",
+    "6857.T": "アドバンテスト",
+    "9983.T": "ファーストリテイリング",
+    "6501.T": "日立製作所",
+    "7011.T": "三菱重工業",
+    # 米国株
+    "AAPL": "アップル",
+    "NVDA": "エヌビディア",
+    "MSFT": "マイクロソフト",
+    "AMZN": "アマゾン",
+    "TSLA": "テスラ"
 }
 
 def fetch_stock_data():
@@ -20,7 +32,6 @@ def fetch_stock_data():
     for symbol, name in SYMBOLS.items():
         try:
             ticker = yf.Ticker(symbol)
-            # fast_info または info から最新データ・前日価格・高安を取得
             info = ticker.fast_info
             
             price = round(float(info.last_price), 2)
@@ -43,7 +54,6 @@ def fetch_stock_data():
         except Exception as e:
             print(f"Error fetching data for {symbol}: {e}")
 
-    # JSONファイルへ保存
     with open("stock_data.json", "w", encoding="utf-8") as f:
         json.dump(output_data, f, ensure_ascii=False, indent=2)
 
