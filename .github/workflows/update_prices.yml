@@ -1,40 +1,39 @@
 name: Auto Fetch Stock Prices
 
 on:
-schedule:
-# 平日の東証・米証券市場時間等をカバー（30分毎実行 - UTC表記）
-- cron: '*/30 * * * *'
-workflow_dispatch: # 手動実行ボタン用
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
 
 jobs:
-update-data:
-runs-on: ubuntu-latest
+  update-data:
+    runs-on: ubuntu-latest
 
-steps:
-- name: Check out repository
-  uses: actions/checkout@v4
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
 
-- name: Set up Python
-  uses: actions/setup-python@v5
-  with:
-    python-version: '3.x'
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
 
-- name: Install dependencies
-  run: |
-    python -m pip install --upgrade pip
-    pip install yfinance
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install yfinance
 
-- name: Fetch prices via yfinance
-  run: python fetch_prices.py
+      - name: Fetch prices via yfinance
+        run: python fetch_prices.py
 
-- name: Commit and Push if changed
-  run: |
-    git config --global user.name "github-actions[bot]"
-    git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-    git add stock_data.json
-    if git diff --staged --quiet; then
-      echo "No changes to commit"
-    else
-      git commit -m "Update stock_data.json via GitHub Actions"
-      git push
-    fi
+      - name: Commit and Push if changed
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add stock_data.json
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update stock_data.json via GitHub Actions"
+            git push
+          fi
