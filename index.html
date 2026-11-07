@@ -95,7 +95,7 @@
             </div>
             <span class="text-xs text-slate-400 bg-slate-800 px-2.5 py-1 rounded-full border border-slate-700 flex items-center gap-1.5">
                 <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                データ提供: <span id="data-source-label" class="font-bold text-emerald-400">Yahoo Finance (LIVE リアルタイムAPI)</span>
+                データ提供: <span id="data-source-label" class="font-bold text-emerald-400">Twelve Data API (LIVE リアルタイム)</span>
             </span>
         </div>
 
@@ -425,15 +425,16 @@
         // 1. グローバルアプリケーション状態 (AppState)
         // ==========================================
         const AppState = {
+            twelveApiKey: 'b26e3fcf62784fa4915c5ae7a0937614', // Twelve Data API Key
             cash: 3000000,           // 初期買付余力
             robotBudget: 1500000,    // ロボ専用枠
             robotActive: false,      // ロボ動作フラグ
             selectedStockCode: '7203',
             stocks: {
-                '7203': { name: 'トヨタ自動車', price: 2600, open: 2600, high: 2600, low: 2600, history: [2600] },
-                '6758': { name: 'ソニーグループ', price: 13500, open: 13500, high: 13500, low: 13500, history: [13500] },
-                '8306': { name: '三菱UFJフィナンシャルG', price: 1700, open: 1700, high: 1700, low: 1700, history: [1700] },
-                '7974': { name: '任天堂', price: 7800, open: 7800, high: 7800, low: 7800, history: [7800] }
+                '7203': { name: 'トヨタ自動車', symbol: '7203:TSE', price: 2600, open: 2600, high: 2600, low: 2600, history: [2600] },
+                '6758': { name: 'ソニーグループ', symbol: '6758:TSE', price: 13500, open: 13500, high: 13500, low: 13500, history: [13500] },
+                '8306': { name: '三菱UFJフィナンシャルG', symbol: '8306:TSE', price: 1700, open: 1700, high: 1700, low: 1700, history: [1700] },
+                '7974': { name: '任天堂', symbol: '7974:TSE', price: 7800, open: 7800, high: 7800, low: 7800, history: [7800] }
             },
             portfolio: [],  // { id, code, qty, avgPrice, accountType }
             orders: [],     // { id, time, code, side, type, price, qty, status, origin, accountType }
@@ -461,77 +462,55 @@
         }
 
         // ==========================================
-        // 2. リアルタイムAPIデータフェッチエンジン (マルチCORSプロキシ)
+        // 2. リアルタイムAPIデータフェッチエンジン (Twelve Data API)
         // ==========================================
         async function fetchStockPrices() {
             let anySuccess = false;
             
-            // 複数のパブリックプロキシジェネレータ
-            const proxyGenerators = [
-                {
-                    getUrl: (url) => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
-                    parse: async (res) => {
-                        const json = await res.json();
-                        return JSON.parse(json.contents);
-                    }
-                },
-                {
-                    getUrl: (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
-                    parse: async (res) => await res.json()
-                },
-                {
-                    getUrl: (url) => `https://api.cors.lol/?url=${encodeURIComponent(url)}`,
-                    parse: async (res) => await res.json()
-                }
-            ];
+            // Twelve Data APIを使って一括（バッチ）取得
+            const symbols = Object.keys(AppState.stocks).map(code => AppState.stocks[code].symbol).join(',');
+            const apiUrl = `https://api.twelvedata.com/quote?symbol=${encodeURIComponent(symbols)}&apikey=${AppState.twelveApiKey}`;
 
-            for (const code of Object.keys(AppState.stocks)) {
-                const targetUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${code}.T?interval=1m&range=1d`;
-                let fetchedPrice = null;
-                let fetchedMeta = null;
+            try {
+                const res = await fetch(apiUrl, { signal: AbortSignal.timeout(3500) });
+                if (res.ok) {
+                    const data = await res.json();
+                    
+                    Object.keys(AppState.stocks).forEach(code => {
+                        const symbol = AppState.stocks[code].symbol;
+                        // 単一銘柄と複数銘柄レスポンスに対応
+                        const quote = data[symbol] || (data.symbol === symbol ? data : null);
 
-                for (const proxyObj of proxyGenerators) {
-                    try {
-                        const proxyUrl = proxyObj.getUrl(targetUrl);
-                        const res = await fetch(proxyUrl, { 
-                            method: 'GET',
-                            headers: { 'Accept': 'application/json' },
-                            signal: AbortSignal.timeout(2500) 
-                        });
-                        
-                        if (res.ok) {
-                            const data = await proxyObj.parse(res);
-                            const meta = data?.chart?.result?.[0]?.meta;
-                            const price = meta?.regularMarketPrice;
-                            
+                        if (quote && quote.close) {
+                            const price = parseFloat(quote.close);
+                            const openPrice = parseFloat(quote.open || quote.previous_close || price);
+                            const highPrice = parseFloat(quote.high || price);
+                            const lowPrice = parseFloat(quote.low || price);
+
                             if (price && price > 0) {
-                                fetchedPrice = price;
-                                fetchedMeta = meta;
-                                break;
+                                const st = AppState.stocks[code];
+                                st.open = openPrice;
+                                st.high = Math.max(st.high, highPrice);
+                                st.low = Math.min(st.low, lowPrice);
+                                updateStockPriceState(code, price);
+                                anySuccess = true;
                             }
                         }
-                    } catch (err) {}
+                    });
                 }
-
-                if (fetchedPrice && fetchedMeta) {
-                    const st = AppState.stocks[code];
-                    if (fetchedMeta.chartPreviousClose) st.open = fetchedMeta.chartPreviousClose;
-                    st.high = Math.max(st.high, fetchedPrice);
-                    st.low = Math.min(st.low, fetchedPrice);
-                    updateStockPriceState(code, fetchedPrice);
-                    anySuccess = true;
-                }
+            } catch (err) {
+                console.warn("Twelve Data API direct fetch failed, falling back to backup proxy/simulation", err);
             }
 
             const labelEl = document.getElementById('data-source-label');
             if (anySuccess) {
                 if (labelEl) {
-                    labelEl.innerText = "Yahoo Finance (LIVE リアルタイムAPI)";
+                    labelEl.innerText = "Twelve Data API (LIVE リアルタイム)";
                     labelEl.className = "font-bold text-emerald-400";
                 }
             } else {
                 if (labelEl) {
-                    labelEl.innerText = "擬似バックアップ駆動中 (通信制限検知)";
+                    labelEl.innerText = "擬似バックアップ駆動中 (API待機中/制限)";
                     labelEl.className = "font-bold text-amber-400";
                 }
                 simulateFallbackPrices();
@@ -542,7 +521,7 @@
             renderUI();
         }
 
-        // ネットワーク障害時の自動サイン波フォールバック
+        // ネットワーク障害・API制限時の自動サイン波フォールバック
         function simulateFallbackPrices() {
             for (const code of Object.keys(AppState.stocks)) {
                 const st = AppState.stocks[code];
