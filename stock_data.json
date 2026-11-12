@@ -1,123 +1,123 @@
 {
-  "updated_at": "2026-11-11 18:31:14",
+  "updated_at": "2026-11-12 01:25:57",
   "stocks": {
     "7203.T": {
       "name": "トヨタ自動車",
-      "price": 3435.0,
-      "change": 11.0,
-      "change_percent": 0.32,
-      "high": 3444.0,
-      "low": 3383.0
+      "price": 3427.0,
+      "change": 12.0,
+      "change_percent": 0.35,
+      "high": 3429.0,
+      "low": 3363.0
     },
     "6758.T": {
       "name": "ソニーグループ",
-      "price": 4200.0,
-      "change": -59.0,
-      "change_percent": -1.39,
-      "high": 4340.0,
-      "low": 4196.0
+      "price": 4268.0,
+      "change": 63.0,
+      "change_percent": 1.5,
+      "high": 4330.0,
+      "low": 4220.0
     },
     "8306.T": {
       "name": "三菱UFJフィナンシャルG",
-      "price": 3502.0,
-      "change": 54.0,
-      "change_percent": 1.57,
-      "high": 3516.0,
-      "low": 3458.0
+      "price": 3487.0,
+      "change": -9.0,
+      "change_percent": -0.26,
+      "high": 3528.0,
+      "low": 3485.0
     },
     "7974.T": {
       "name": "任天堂",
-      "price": 8371.0,
-      "change": -101.0,
-      "change_percent": -1.19,
-      "high": 8690.0,
-      "low": 8343.0
+      "price": 8455.0,
+      "change": 93.0,
+      "change_percent": 1.11,
+      "high": 8703.0,
+      "low": 8423.0
     },
     "9984.T": {
       "name": "ソフトバンクG",
-      "price": 3855.0,
-      "change": -42.0,
-      "change_percent": -1.08,
-      "high": 3902.0,
-      "low": 3465.0
+      "price": 3904.0,
+      "change": 56.0,
+      "change_percent": 1.46,
+      "high": 4033.0,
+      "low": 3761.0
     },
     "8035.T": {
       "name": "東京エレクトロン",
-      "price": 9272.0,
-      "change": 294.0,
-      "change_percent": 3.27,
-      "high": 9376.0,
-      "low": 8845.0
+      "price": 9477.0,
+      "change": 156.0,
+      "change_percent": 1.67,
+      "high": 9599.0,
+      "low": 9251.0
     },
     "6857.T": {
       "name": "アドバンテスト",
-      "price": 31440.0,
-      "change": 1935.0,
-      "change_percent": 6.56,
-      "high": 31470.0,
-      "low": 28960.0
+      "price": 30400.0,
+      "change": -1040.0,
+      "change_percent": -3.31,
+      "high": 31300.0,
+      "low": 29875.0
     },
     "9983.T": {
       "name": "ファーストリテイリング",
-      "price": 80480.0,
-      "change": -820.0,
-      "change_percent": -1.01,
-      "high": 84090.0,
-      "low": 79920.0
+      "price": 80970.0,
+      "change": 90.0,
+      "change_percent": 0.11,
+      "high": 82150.0,
+      "low": 80000.0
     },
     "6501.T": {
       "name": "日立製作所",
-      "price": 4950.0,
-      "change": 72.0,
-      "change_percent": 1.48,
-      "high": 4993.0,
-      "low": 4924.0
+      "price": 5051.0,
+      "change": 92.0,
+      "change_percent": 1.86,
+      "high": 5073.0,
+      "low": 4968.0
     },
     "7011.T": {
       "name": "三菱重工業",
-      "price": 3138.0,
-      "change": -10.0,
-      "change_percent": -0.32,
-      "high": 3170.0,
-      "low": 3038.0
+      "price": 3198.0,
+      "change": 75.0,
+      "change_percent": 2.4,
+      "high": 3206.0,
+      "low": 3125.0
     },
     "AAPL": {
       "name": "アップル",
-      "price": 355.17,
-      "change": 6.36,
-      "change_percent": 1.82,
-      "high": 355.33,
+      "price": 355.63,
+      "change": 6.82,
+      "change_percent": 1.96,
+      "high": 355.9,
       "low": 349.33
     },
     "NVDA": {
       "name": "エヌビディア",
-      "price": 177.32,
-      "change": 7.24,
-      "change_percent": 4.26,
-      "high": 177.37,
+      "price": 173.73,
+      "change": 3.65,
+      "change_percent": 2.15,
+      "high": 177.54,
       "low": 170.77
     },
     "MSFT": {
       "name": "マイクロソフト",
-      "price": 521.37,
-      "change": -13.63,
-      "change_percent": -2.55,
+      "price": 521.12,
+      "change": -13.88,
+      "change_percent": -2.59,
       "high": 534.76,
-      "low": 518.5
+      "low": 518.45
     },
     "AMZN": {
       "name": "アマゾン",
-      "price": 266.52,
-      "change": -4.78,
-      "change_percent": -1.76,
+      "price": 266.17,
+      "change": -5.13,
+      "change_percent": -1.89,
       "high": 274.87,
-      "low": 265.7
+      "low": 265.62
     },
     "TSLA": {
       "name": "テスラ",
-      "price": 393.56,
-      "change": 12.46,
-      "change_percent": 3.27,
+      "price": 390.84,
+      "change": 9.74,
+      "change_percent": 2.56,
       "high": 395.43,
       "low": 386.35
     }
