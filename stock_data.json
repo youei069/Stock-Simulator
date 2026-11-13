@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-11-13 11:27:02",
+  "updated_at": "2026-11-13 18:42:28",
   "stocks": {
     "7203.T": {
       "name": "トヨタ自動車",
@@ -83,43 +83,43 @@
     },
     "AAPL": {
       "name": "アップル",
-      "price": 354.88,
-      "change": -0.1,
-      "change_percent": -0.03,
-      "high": 359.37,
-      "low": 354.41
+      "price": 358.07,
+      "change": 2.72,
+      "change_percent": 0.77,
+      "high": 360.83,
+      "low": 357.3
     },
     "NVDA": {
       "name": "エヌビディア",
-      "price": 166.19,
-      "change": -1.65,
-      "change_percent": -0.98,
-      "high": 167.14,
-      "low": 148.8
+      "price": 162.13,
+      "change": -5.9,
+      "change_percent": -3.51,
+      "high": 170.0,
+      "low": 158.39
     },
     "MSFT": {
       "name": "マイクロソフト",
-      "price": 523.0,
-      "change": 1.91,
-      "change_percent": 0.37,
-      "high": 529.66,
-      "low": 520.0
+      "price": 523.76,
+      "change": 1.77,
+      "change_percent": 0.34,
+      "high": 526.07,
+      "low": 513.82
     },
     "AMZN": {
       "name": "アマゾン",
-      "price": 267.44,
-      "change": -0.84,
-      "change_percent": -0.31,
-      "high": 273.6,
-      "low": 267.2
+      "price": 265.62,
+      "change": -2.71,
+      "change_percent": -1.01,
+      "high": 269.94,
+      "low": 263.91
     },
     "TSLA": {
       "name": "テスラ",
-      "price": 397.45,
-      "change": -2.4,
-      "change_percent": -0.6,
-      "high": 401.22,
-      "low": 385.2
+      "price": 390.5,
+      "change": -9.24,
+      "change_percent": -2.31,
+      "high": 404.4,
+      "low": 385.83
     }
   }
 }
